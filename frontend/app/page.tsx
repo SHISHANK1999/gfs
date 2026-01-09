@@ -8,36 +8,32 @@ export default function LoginPage() {
   const router = useRouter();
 
   const sendOtp = async () => {
-    if (!phone) return alert("Enter phone number");
+  try {
     setLoading(true);
-   
-    try{
+
     const res = await fetch(
-      "https://gfs-backend-Osy3.onrender.com/api/auth/send-otp",
+      "https://gfs-backend.onrender.com/api/auth/send-otp",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: phone })
+        body: JSON.stringify({ phoneNumber: phone }),
+        cache: "no-store"
       }
     );
 
-    const data = await res.json();
-    console.log("OTP RESPONSE 👉", data); // 👈 ADD THIS
-    setLoading(false);
-
-    if (res.ok) {
-      localStorage.setItem("phoneNumber", phone);
-      console.log("Redirecting to verify-otp"); // 👈 ADD
-      router.push("/verify-otp");
-    } else {
-     alert(data.message || "OTP send failed");
+    if (!res.ok) {
+      alert("Backend waking up, try again");
+      return;
     }
+
+    localStorage.setItem("phoneNumber", phone);
+    router.push("/verify-otp");
   } catch (err) {
-    console.error("FETCH ERROR 👉", err);
-    alert("Network error");
+    alert("Backend is waking up, retry in 10 sec");
+  } finally {
     setLoading(false);
   }
-  };
+};
 
   return (
     <div className="min-h-screen flex">
