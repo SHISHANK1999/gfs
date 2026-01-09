@@ -11,40 +11,36 @@ const authRoutes = require("./routes/auth.routes");
 
 // routes
 app.use("/api/auth", authRoutes);
-
 const userRoutes = require("./routes/user.routes");
-
 app.use("/api/user", userRoutes);
 
 // study routes
 const studyRoutes = require("./routes/study.routes");
-
 app.use("/api/study", studyRoutes);
 
 // summary routes
 const summaryRoutes = require("./routes/summary.routes");
-
 app.use("/api/summary", summaryRoutes);
 
 // analytics routes
 const analyticsRoutes = require("./routes/analytics.routes");
-
 app.use("/api/analytics", analyticsRoutes);
 
 // group analytics routes
 const groupAnalyticsRoutes = require("./routes/groupAnalytics.routes");
-
 app.use("/api/group-analytics", groupAnalyticsRoutes);
 
 // group routes
 const groupRoutes = require("./routes/group.routes");
-
 app.use("/api/groups", groupRoutes);
 
 // group study routes
 const groupStudyRoutes = require("./routes/groupStudy.routes");
-
 app.use("/api/group-study", groupStudyRoutes);
+
+// notification routes
+const notificationRoutes = require("./routes/notification.routes");
+app.use("/api/notifications", notificationRoutes);
 
 // test route
 app.get("/", (req, res) => {
