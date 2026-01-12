@@ -1,38 +1,100 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 
 export default function LoginPage() {
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const sendOtp = async () => {
-    await fetch("https://gfs-backend-0sy3.onrender.com/api/auth/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phoneNumber: phone })
-    });
+    if (!phone) {
+      alert("Please enter phone number");
+      return;
+    }
 
-    alert("OTP sent");
+    try {
+      setLoading(true);
+
+      const res = await fetch(
+        "https://gfs-backend-0sy3.onrender.com/api/auth/send-otp",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ phoneNumber: phone })
+        }
+      );
+
+      if (!res.ok) {
+        alert("Server is starting, please try again");
+        return;
+      }
+
+      localStorage.setItem("phoneNumber", phone);
+      router.push("/verify-otp");
+    } catch (error) {
+      alert("Backend waking up, try again in few seconds");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="h-screen flex items-center justify-center">
-      <div className="w-80 p-6 border rounded-xl">
-        <h1 className="text-xl font-bold mb-4">Login</h1>
+    <>
+    {loading && <LoadingOverlay text="Sending OTP..." />}
+    <div className="min-h-screen flex items-center justify-center bg-white px-6">
+      <div className="max-w-sm w-full flex flex-col items-center text-center">
+        {/* LOGO */}
+        <div className="relative w-32 h-32 mb-6">
+          <Image
+            src="/logo.png"
+            alt="GFS Logo"
+            fill
+            className="object-contain"
+          />
+        </div>
 
+        {/* TITLE */}
+        <h1 className="text-3xl font-semibold text-[#0F172A]">
+          Login to GFS
+        </h1>
+
+        <p className="mt-3 text-gray-500 text-sm leading-relaxed">
+          Enter your phone number to continue your focused study journey.
+        </p>
+
+        {/* INPUT */}
         <input
-          className="border p-2 w-full mb-4"
+          type="tel"
           placeholder="Phone number"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          className="mt-6 w-full border border-gray-300 rounded-xl px-4 py-3
+          text-center text-base focus:outline-none
+          focus:ring-2 focus:ring-[#0EA5E9]"
         />
 
+        {/* BUTTON */}
         <button
           onClick={sendOtp}
-          className="bg-black text-white w-full py-2 rounded"
+          disabled={loading}
+          className="mt-6 w-full bg-[#0EA5E9] text-white py-3 rounded-xl font-medium
+          hover:bg-[#0284C7] transition disabled:opacity-50"
         >
-          Send OTP
+          {loading ? "Sending OTP..." : "Send OTP"}
         </button>
+
+        {/* NOTE */}
+        <p className="mt-4 text-xs text-gray-400">
+          We’ll send you a one-time password to verify your number.
+        </p>
       </div>
     </div>
+    </>
+
   );
 }

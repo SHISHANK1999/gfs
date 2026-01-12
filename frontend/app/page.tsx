@@ -1,88 +1,35 @@
+// app/page.tsx
 "use client";
-import { useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
-export default function LoginPage() {
-  const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function SplashPage() {
   const router = useRouter();
 
-  const sendOtp = async () => {
-  try {
-    setLoading(true);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      router.push("/intro"); 
+    }, 1000); // 1 sec splash
 
-    const res = await fetch(
-      "https://gfs-backend.onrender.com/api/auth/send-otp",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: phone }),
-        cache: "no-store"
-      }
-    );
-
-    if (!res.ok) {
-      alert("Backend waking up, try again");
-      return;
-    }
-
-    localStorage.setItem("phoneNumber", phone);
-    router.push("/verify-otp");
-  } catch (err) {
-    alert("Backend is waking up, retry in 10 sec");
-  } finally {
-    setLoading(false);
-  }
-};
+    return () => clearTimeout(timer);
+  }, [router]);
 
   return (
-    <div className="min-h-screen flex">
-      {/* LEFT SIDE – VISUAL */}
-      <div className="hidden md:flex w-1/2 items-center justify-center
-        bg-gradient-to-br from-indigo-50 to-cyan-50">
-        <div className="text-center max-w-sm">
-          <h1 className="text-3xl font-bold text-indigo-600 mb-4">
-            Group Focused Study
-          </h1>
-          <p className="text-gray-600">
-            Study together. Stay consistent. Build focus.
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT SIDE – LOGIN */}
-      <div className="w-full md:w-1/2 flex items-center justify-center bg-white">
-        <div className="w-80">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome back
-          </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Login to start your focus session
-          </p>
-
-          <input
-            type="tel"
-            placeholder="Phone number"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4
-              focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-
-          <button
-            onClick={sendOtp}
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg
-              hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {loading ? "Sending OTP..." : "Send OTP"}
-          </button>
-
-          <p className="text-xs text-gray-400 mt-6 text-center">
-            No spam. Only study reminders.
-          </p>
-        </div>
-      </div>
-    </div>
+    <div className="min-h-screen flex items-center justify-center bg-white">
+         <div className="flex flex-col items-center">
+           {/* BIG LOGO */}
+           <div className="relative w-56 h-56 md:w-150 md:h-120">
+             <Image
+               src="/logo.png"
+               alt="GFS Logo"
+               fill
+               priority
+               className="object-contain"
+             />
+           </div>
+   
+         </div>
+       </div>
   );
 }

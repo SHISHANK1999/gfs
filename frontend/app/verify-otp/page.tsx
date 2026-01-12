@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 
 export default function VerifyOtpPage() {
   const [otp, setOtp] = useState("");
@@ -11,7 +13,7 @@ export default function VerifyOtpPage() {
   useEffect(() => {
     const savedPhone = localStorage.getItem("phoneNumber");
     if (!savedPhone) {
-      router.push("/");
+      router.push("/login");
     } else {
       setPhone(savedPhone);
     }
@@ -30,7 +32,9 @@ export default function VerifyOtpPage() {
         "https://gfs-backend-0sy3.onrender.com/api/auth/verify-otp",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify({
             phoneNumber: phone,
             otp,
@@ -41,69 +45,72 @@ export default function VerifyOtpPage() {
 
       const data = await res.json();
 
-      if (data.success) {
-        localStorage.setItem("token", data.token);
-        router.push("/dashboard");
-      } else {
+      if (!res.ok) {
         alert(data.message || "OTP verification failed");
+        return;
       }
-    } catch (err) {
-      alert("Server error");
+
+      localStorage.setItem("token", data.token);
+      router.push("/profile");
+    } catch (error) {
+      alert("Backend waking up, try again");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* LEFT – VISUAL */}
-      <div className="hidden md:flex w-1/2 items-center justify-center
-        bg-gradient-to-br from-indigo-50 to-cyan-50">
-        <div className="text-center max-w-sm">
-          <h1 className="text-3xl font-bold text-indigo-600 mb-4">
-            Stay Focused
-          </h1>
-          <p className="text-gray-600">
-            One step away from your study session
-          </p>
-        </div>
-      </div>
-
-      {/* RIGHT – VERIFY OTP */}
-      <div className="w-full md:w-1/2 flex items-center justify-center bg-white">
-        <div className="w-80">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Verify OTP
-          </h2>
-
-          <p className="text-sm text-gray-500 mb-6">
-            Enter the OTP sent to <b>{phone}</b>
-          </p>
-
-          <input
-            type="text"
-            placeholder="Enter OTP"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4
-              text-center tracking-widest
-              focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
+    <>
+    {loading && <LoadingOverlay text="Verifying OTP..." />}
+    <div className="min-h-screen flex items-center justify-center bg-white px-6">
+      <div className="max-w-sm w-full flex flex-col items-center text-center">
+        {/* LOGO */}
+        <div className="relative w-28 h-28 mb-6">
+          <Image
+            src="/logo.png"
+            alt="GFS Logo"
+            fill
+            className="object-contain"
           />
-
-          <button
-            onClick={verifyOtp}
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2 rounded-lg
-              hover:bg-indigo-700 transition disabled:opacity-50"
-          >
-            {loading ? "Verifying..." : "Verify & Continue"}
-          </button>
-
-          <p className="text-xs text-gray-400 mt-6 text-center">
-            Didn’t receive OTP? Use <b>123456</b> for demo
-          </p>
         </div>
+
+        {/* TITLE */}
+        <h1 className="text-3xl font-semibold text-[#0F172A]">
+          Verify OTP
+        </h1>
+
+        <p className="mt-3 text-gray-500 text-sm leading-relaxed">
+          Enter the OTP sent to <b>{phone}</b>
+        </p>
+
+        {/* OTP INPUT */}
+        <input
+          type="text"
+          placeholder="Enter OTP"
+          value={otp}
+          onChange={(e) => setOtp(e.target.value)}
+          className="mt-6 w-full border border-gray-300 rounded-xl px-4 py-3
+          text-center tracking-widest text-lg focus:outline-none
+          focus:ring-2 focus:ring-[#0EA5E9]"
+        />
+
+        {/* BUTTON */}
+        <button
+          onClick={verifyOtp}
+          disabled={loading}
+          className="mt-6 w-full bg-[#0EA5E9] text-white py-3 rounded-xl font-medium
+          hover:bg-[#0284C7] transition disabled:opacity-50"
+        >
+          {loading ? "Verifying..." : "Verify & Continue"}
+        </button>
+
+        {/* HINT */}
+        <p className="mt-4 text-xs text-gray-400">
+          For demo, use OTP <b>123456</b>
+        </p>
       </div>
     </div>
+    </>
+
   );
 }

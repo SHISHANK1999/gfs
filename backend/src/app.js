@@ -1,13 +1,18 @@
 const express = require("express");
 const cors = require("cors");
-
+const authRoutes = require("./routes/auth.routes");
+const notificationRoutes = require("./routes/notification.routes");
 const app = express();
 
 // middleware
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 
-const authRoutes = require("./routes/auth.routes");
+// const authRoutes = require("./routes/auth.routes");
 
 // routes
 app.use("/api/auth", authRoutes);
@@ -39,8 +44,14 @@ const groupStudyRoutes = require("./routes/groupStudy.routes");
 app.use("/api/group-study", groupStudyRoutes);
 
 // notification routes
-const notificationRoutes = require("./routes/notification.routes");
+// const notificationRoutes = require("./routes/notification.routes");
 app.use("/api/notifications", notificationRoutes);
+
+// upload routes
+app.use("/api/upload", require("./routes/upload.routes"));
+app.use("/uploads", express.static("uploads"));
+// download routes
+app.use("/api/download", require("./routes/download.routes"));
 
 // test route
 app.get("/", (req, res) => {
