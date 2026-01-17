@@ -2,24 +2,34 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ChatPanel from "../components/ ChatPanel";
+import { socket } from "../lib/socket";
 
 export default function DashboardPage() {
-  /* ================= BASIC STATE ================= */
   const router = useRouter();
+
+  /* ================= GLOBAL APP STATE ================= */
   const [showProfile, setShowProfile] = useState(false);
+
+  // 🔑 Single source of truth for selected group
+  const [activeGroupId, setActiveGroupId] = useState("1");
 
   /* ================= FOCUS SESSION ================= */
   const [isFocusOn, setIsFocusOn] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+  const [customMinutes, setCustomMinutes] = useState<number>(30);
 
   const [showFocusSetup, setShowFocusSetup] = useState(false);
   const [showFocusEnd, setShowFocusEnd] = useState(false);
 
   const [focusDuration, setFocusDuration] = useState(25);
   const [focusSubject, setFocusSubject] = useState("DSA");
-  const [focusGroup, setFocusGroup] = useState("Solo");
 
-  /* ================= TIMER LOGIC ================= */
+
+  useEffect(() => {
+  const userId = localStorage.getItem("userId");
+  socket.emit("join-user", userId);
+}, []);
+  /* ================= TIMER ================= */
   useEffect(() => {
     if (!isFocusOn) return;
 
@@ -44,10 +54,24 @@ export default function DashboardPage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  /* ================= START FOCUS ================= */
+  const startFocus = () => {
+    setSecondsLeft(focusDuration * 60);
+    setIsFocusOn(true);
+    setShowFocusSetup(false);
+
+    // socket.emit("start-focus", {
+    //   groupId: activeGroupId,
+    //   user: "Shishank",
+    //   duration: focusDuration,
+    //   subject: focusSubject
+    // });
+  };
+
   return (
     <div className="relative h-screen flex flex-col bg-[#F8FAFC]">
 
-      {/* ================= FOCUS GLOW BACKGROUND ================= */}
+      {/* ================= FOCUS GLOW ================= */}
       {isFocusOn && (
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className="absolute inset-0 bg-[#0EA5E9]/5 animate-pulse" />
@@ -61,134 +85,133 @@ export default function DashboardPage() {
         <div className="flex items-center gap-3">
           <div
             onClick={() => setShowProfile(!showProfile)}
-            className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center
-            text-sm font-medium cursor-pointer hover:ring-2 hover:ring-[#0EA5E9]/40"
+            className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium cursor-pointer"
           >
             S
           </div>
-          <span className="text-sm font-medium text-[#0F172A]">
-            Shishank
-          </span>
+          <span className="text-sm font-medium">Shishank</span>
         </div>
 
-        {/* Focus timer & button */}
+        {/* Focus */}
         <div className="flex items-center gap-4">
-          <span
-            className={`text-sm font-medium ${
-              isFocusOn
-                ? "animate-[pulse_3s_ease-in-out_infinite] text-[#0284C7]"
-                : "text-[#0F172A]"
-            }`}
-          >
+          <span className="text-sm font-medium">
             ⏱️ {formatTime(secondsLeft)}
-          </span>
+          </span>          
+          {/* ✅ ONE BUTTON: Start / End */}
+  <button
+    onClick={() => {
+      // ✅ अगर focus चल रहा है → End Session
+      if (isFocusOn) {
+        setIsFocusOn(false);
+        setSecondsLeft(0);
 
-          <button
-            onClick={() => setShowFocusSetup(true)}
-            className="px-5 py-1.5 rounded-full text-sm font-medium bg-[#0EA5E9] text-white hover:bg-[#0284C7] transition"
-          >
-            Start Study
-          </button>
+        socket.emit("end-focus", {
+          groupId: activeGroupId,
+          user: "Shishank"
+        });
+
+        return;
+      }
+
+      // ✅ अगर focus नहीं चल रहा → Open setup modal
+      setShowFocusSetup(true);
+    }}
+    className={`px-5 py-2 rounded-xl text-sm font-medium transition ${
+      isFocusOn
+        ? "bg-red-500 text-white hover:bg-red-600"
+        : "bg-[#0EA5E9] text-white hover:bg-[#0284C7]"
+    }`}
+  >
+    {isFocusOn ? "End Session" : "Start Study"}
+  </button>
         </div>
 
-        {/* Simple stats (dummy) */}
-        <div className="flex items-center gap-6 text-sm text-gray-500">
-          <span>🔥 4 day streak</span>
-          <span>Today: 01h 25m</span>
+        <div className="text-sm text-gray-500">
+          🔥 4 day streak
         </div>
       </div>
 
-      {/* ================= PROFILE DROPDOWN ================= */}
+      {/* ================= PROFILE MENU ================= */}
       {showProfile && (
-        <div className="absolute top-14 left-6 w-64 bg-white rounded-2xl shadow-xl p-4 z-50">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-[#E0F2FE] flex items-center justify-center text-sm font-medium text-[#0284C7]">
-              S
-            </div>
-            <div>
-              <p className="text-sm font-medium text-[#0F172A]">Shishank</p>
-              <p className="text-xs text-gray-500">🔥 4 day streak</p>
-            </div>
-          </div>
+        <div className="absolute top-14 left-6 w-60 bg-white rounded-xl shadow-xl p-4 z-50">
+          <p className="text-sm font-medium mb-3">Shishank</p>
 
-          <div className="border-t my-2" />
-
-          <div className="space-y-1 text-sm">
-            <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100">
-              ✏️ Edit Profile
-            </button>
-
-            <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100">
-              ⚙️ Settings
-            </button>
-
-            <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-100">
-              ℹ️ About
-            </button>
-
-            <button
-              onClick={() => {
-                localStorage.removeItem("token");
-                router.push("/login");
-              }}
-              className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-500"
-            >
-              🚪 Logout
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem("token");
+              router.push("/login");
+            }}
+            className="text-sm text-red-500"
+          >
+            Logout
+          </button>
         </div>
       )}
 
-      {/* ================= MAIN BODY (CHAT APP) ================= */}
+      {/* ================= MAIN BODY ================= */}
       <div className="relative z-10 flex flex-1 overflow-hidden">
-        <ChatPanel />
+
+        {/* 🔥 ChatPanel gets group state from Dashboard */}
+        <ChatPanel
+          activeGroupId={activeGroupId}
+          setActiveGroupId={setActiveGroupId}
+        />
+
       </div>
 
-      {/* ================= FOCUS SETUP MODAL ================= */}
+      {/* ================= FOCUS SETUP ================= */}
       {showFocusSetup && (
         <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white w-[360px] rounded-2xl p-6 shadow-xl space-y-5">
+          <div className="bg-white w-[360px] rounded-xl p-6 space-y-5">
 
-            <h2 className="text-lg font-semibold text-[#0F172A]">
-              Start Study Session
-            </h2>
+            <h2 className="text-lg font-semibold">Start Study Session</h2>
 
-            {/* Duration */}
             <div>
-              <p className="text-sm text-gray-500 mb-2">⏱ Duration</p>
+              <p className="text-sm mb-2">Duration</p>
+              
               <div className="flex gap-2">
                 {[25, 45, 60].map((t) => (
                   <button
                     key={t}
                     onClick={() => setFocusDuration(t)}
-                    className={`px-4 py-2 rounded-lg text-sm ${
+                    className={`px-3 py-2 rounded ${
                       focusDuration === t
                         ? "bg-[#0EA5E9] text-white"
                         : "bg-gray-100"
                     }`}
                   >
                     {t} min
+                    
                   </button>
+                  
                 ))}
-
                 <input
-                  type="number"
-                  placeholder="Custom"
-                  onChange={(e) => setFocusDuration(Number(e.target.value))}
-                  className="w-20 px-2 py-2 border rounded-lg text-sm"
-                />
+  type="number"
+  min={1}
+  placeholder="Custom"
+  value={customMinutes}
+  onChange={(e) => setCustomMinutes(Number(e.target.value))}
+  className="w-24 px-3 py-2 border rounded-lg text-sm"
+  
+/>
+
+<button
+  onClick={() => setFocusDuration(customMinutes)}
+  className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
+>
+  Set
+</button>
               </div>
             </div>
 
-            {/* Subject */}
             <div>
-              <p className="text-sm text-gray-500 mb-2">📘 What are you studying?</p>
-              <div className="flex gap-2 flex-wrap">
-                {["DSA", "Web", "Exam", "Custom"].map((s) => (
+              <p className="text-sm mb-2">Subject</p>
+              <div className="flex gap-2">
+                {["DSA", "Web", "Exam","Self"].map((s) => (
                   <button
                     key={s}
                     onClick={() => setFocusSubject(s)}
-                    className={`px-3 py-2 rounded-lg text-sm ${
+                    className={`px-3 py-2 rounded ${
                       focusSubject === s
                         ? "bg-[#0EA5E9] text-white"
                         : "bg-gray-100"
@@ -200,76 +223,39 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Group */}
-            <div>
-              <p className="text-sm text-gray-500 mb-2">👥 Study with</p>
-              <div className="flex gap-2 flex-wrap">
-                {["Solo", "DSA Group", "MCA Sem 4"].map((g) => (
-                  <button
-                    key={g}
-                    onClick={() => setFocusGroup(g)}
-                    className={`px-3 py-2 rounded-lg text-sm ${
-                      focusGroup === g
-                        ? "bg-[#0EA5E9] text-white"
-                        : "bg-gray-100"
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-between pt-4">
-              <button
-                onClick={() => setShowFocusSetup(false)}
-                className="text-sm text-gray-500"
-              >
-                Cancel
-              </button>
-
+            <div className="flex justify-end gap-3 pt-4">
+              <button onClick={() => setShowFocusSetup(false)}>Cancel</button>
               <button
                 onClick={() => {
-                  setSecondsLeft(focusDuration * 60);
-                  setIsFocusOn(true);
-                  setShowFocusSetup(false);
-                }}
-                className="bg-[#0EA5E9] text-white px-5 py-2 rounded-xl text-sm"
+    setSecondsLeft(focusDuration * 60);
+    setIsFocusOn(true);
+    setShowFocusSetup(false);
+
+    socket.emit("start-focus", {
+      groupId: activeGroupId,
+      user: "Shishank",
+      duration: focusDuration,
+      subject: focusSubject
+    });
+  }}
+                className="bg-[#0EA5E9] text-white px-4 py-2 rounded"
               >
-                Start Session
+                Start
               </button>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* ================= FOCUS END MODAL ================= */}
+      {/* ================= FOCUS END ================= */}
       {showFocusEnd && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white w-[340px] rounded-2xl p-6 shadow-xl text-center space-y-5">
-
-            <h2 className="text-lg font-semibold text-[#0F172A]">
-              🎉 Session Complete
-            </h2>
-
-            <p className="text-sm text-gray-500">
-              You studied for {focusDuration} minutes
-            </p>
-
-            <div>
-              <p className="text-sm mb-2">How was it?</p>
-              <div className="flex justify-center gap-4 text-2xl">
-                <button>😐</button>
-                <button>🙂</button>
-                <button>🔥</button>
-              </div>
-            </div>
-
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl text-center space-y-4">
+            <h2 className="text-lg font-semibold">Session Complete 🎉</h2>
+            <p>You studied for {focusDuration} minutes</p>
             <button
               onClick={() => setShowFocusEnd(false)}
-              className="bg-[#0EA5E9] text-white w-full py-2 rounded-xl"
+              className="bg-[#0EA5E9] text-white px-4 py-2 rounded"
             >
               Done
             </button>

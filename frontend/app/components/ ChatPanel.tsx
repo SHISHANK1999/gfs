@@ -1,8 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useEffect } from "react";
+import { socket } from "../lib/socket";
+
+/* ================= TYPES ================= */
 
 type Message = {
-  id: number;
+  id: string;
   sender: string;
   text?: string;
   time: string;
@@ -15,69 +19,432 @@ type Group = {
   name: string;
 };
 
+type Member = {
+  _id: string;
+  name?: string;
+  phoneNumber: string;
+};
+
+/* ================= COMPONENT ================= */
 
 export default function ChatPanel() {
-  const [groups, setGroups] = useState<Group[]>([
-    { id: "1", name: "DSA Group" },
-    { id: "2", name: "MCA Sem 4" },
-    { id: "3", name: "Night Focus" }
-  ]);
 
-  const [activeGroupId, setActiveGroupId] = useState("1");
+  /* ===== Groups ===== */
+ const [groups, setGroups] = useState<Group[]>([]);
+ useEffect(() => {
+  const fetchGroups = async () => {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("http://localhost:5001/api/groups", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await res.json();
+
+    const realGroups = (data.groups || []).map((g: any) => ({
+      id: g._id,
+      name: g.name
+    }));
+
+    setGroups(realGroups);
+
+     if (realGroups.length > 0) {
+      setActiveGroupId(realGroups[0].id);
+      fetchMessages(realGroups[0].id);
+    }
+  };
+
+  fetchGroups();
+}, []);
+
+  const [activeGroupId, setActiveGroupId] = useState("");
+  useEffect(() => {
+  const fetchGroups = async () => {
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch("http://localhost:5001/api/groups", {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      const realGroups = (data.groups || []).map((g: any) => ({
+        id: g._id,
+        name: g.name
+      }));
+
+      setGroups(realGroups);
+
+      // ✅ default first group select
+      if (realGroups.length > 0) {
+        setActiveGroupId(realGroups[0].id);
+      }
+    } catch (err) {
+      console.log("Fetch groups error:", err);
+    }
+  };
+
+  fetchGroups();
+}, []);
+
+ /* ===== CHAT STATE ===== */
+  const [messages, setMessages] = useState<Record<string, Message[]>>({ });
+  const [chatInput, setChatInput] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
+
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invitePhone, setInvitePhone] = useState("");
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+ /* ===== CONTEXT MENU ===== */
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     fileUrl: string;
     fileName?: string;
-  } | null>(null);
+     } | null>(null);
 
-  const [messages, setMessages] = useState<Record<string, Message[]>>({
-    "1": [
-      { id: 1, sender: "Aman", text: "Let’s start DSA", time: "8:45 PM" },
-      { id: 2, sender: "You", text: "Yes 👍", time: "8:46 PM" }
-    ],
-    "2": [
-      { id: 1, sender: "Riya", text: "Sem 4 notes ready?", time: "9:10 PM" }
-    ],
-    "3": []
-  });
-
-  const [chatInput, setChatInput] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const activeGroup = groups.find((g) => g.id === activeGroupId);
+// soket checking
+useEffect(() => {
+  socket.emit("join-group", activeGroupId);
+}, [activeGroupId]);
 
-  /* ================= UPLOAD FILE ================= */
-  const uploadFile = async (file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
+useEffect(() => {
+  const handleFocusStarted = (data: any) => {
+        console.log("✅ focus-started received:", data);
+    alert(
+      `🔥 Focus Started!\n\n${data.user} started ${data.subject} for ${data.duration} min`
+    );
+  };
 
-  const res = await fetch("http://localhost:5001/api/upload", {
-    method: "POST",
-    body: formData
-  });
+  socket.on("focus-started", handleFocusStarted);
+
+  return () => {
+    socket.off("focus-started", handleFocusStarted);
+  };
+}, []);
+
+useEffect(() => {
+  const handleReceive = ({ groupId, message }) => {
+    setMessages((prev) => ({
+      ...prev,
+      [groupId]: [...(prev[groupId] || []), message]
+    }));
+  };
+
+  socket.on("receive-message", handleReceive);
+
+  return () => {
+    socket.off("receive-message", handleReceive);
+  };
+}, []);
+
+useEffect(() => {
+  const handleNotify = ({ groupId, text }) => {
+    if (groupId !== activeGroupId) {
+      alert("🔔 " + text);
+    }
+  };
+
+  socket.on("notify", handleNotify);
+
+  return () => {
+    socket.off("notify", handleNotify);
+  };
+}, [activeGroupId]);
+  /* ================= SOCKET ================= */
+// useEffect(() => {
+//   const onReceiveMessage = ({ groupId, message }) => {
+//     setMessages((prev) => ({
+//       ...prev,
+//       [groupId]: [...(prev[groupId] || []), message]
+//     }));
+//   };
+
+//   const onNotify = (data) => {
+//     // ❗ notify तभी दिखाओ जब group active न हो
+//     if (data.groupId !== activeGroupId) {
+//       alert("🔔 " + data.text);
+//     }
+//   };
+
+//   const onFocusStarted = (data) => {
+//     alert(`🔥 ${data.user} started ${data.subject}`);
+//   };
+
+//   socket.on("receive-message", onReceiveMessage);
+//   socket.on("notify", onNotify);
+//   socket.on("focus-started", onFocusStarted);
+
+//   return () => {
+//     socket.off("receive-message", onReceiveMessage);
+//     socket.off("notify", onNotify);
+//     socket.off("focus-started", onFocusStarted);
+//   };
+// }, [activeGroupId]);
+// // join your personal user room (one time)
+// useEffect(() => {
+//   const userId = "Shishank"; // later real user id
+//   socket.emit("join-user", userId);
+// }, []);
+
+// // join active group room
+// useEffect(() => {
+//   socket.emit("join-group", activeGroupId);
+// }, [activeGroupId]);
+
+// // listen for all events
+// useEffect(() => {
+
+//   // group chat messages
+//   const handler = ({ groupId, message }) => {
+//     // setMessages((prev) => {
+//     //   const old = prev[groupId] || [];
+
+//     //   return {
+//     //     ...prev,
+//     //     [groupId]: [...old, message]
+//     //   };
+//     // });
+//   };
+//   socket.on("receive-message", handler);
+
   
+
+//   socket.on("receive-message", ({ groupId, message }) => {
+//     setMessages((prev) => ({
+//       ...prev,
+//       [groupId]: [...(prev[groupId] || []), message]
+//     }));
+//   });
+
+//   // background notifications (other groups)
+//   socket.on("notify", (data) => {
+//     alert("🔔 " + data.text);
+//   });
+
+//   // focus started alert
+//   socket.on("focus-started", (data) => {
+//     alert(`🔥 ${data.user} started ${data.subject} (${data.duration} min)`);
+//   });
+
+//   return () => {
+//     socket.off("receive-message");
+//     socket.off("notify");
+//     socket.off("focus-started");
+//   };
+// }, []);
+  /* ================= HELPERS ================= */
+const createGroup = async (name: string) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch("http://localhost:5001/api/groups/create", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ name })
+  });
+
   const data = await res.json();
 
-  return "http://localhost:5001" + data.fileUrl;
+  if (!data.success) {
+    alert(data.message || "Group create failed");
+    return null;
+  }
+
+  return {
+    id: data.group._id,
+    name: data.group.name
+  };
+};
+  // Upload file to backend
+  const uploadFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("http://localhost:5001/api/upload", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    return "http://localhost:5001" + data.fileUrl;
+  };
+
+  const API_BASE = "http://localhost:5001";
+const token = () => localStorage.getItem("token");
+
+const fetchMembers = async (groupId: string) => {
+  try {
+    setLoadingMembers(true);
+
+    const res = await fetch(`${API_BASE}/api/groups/${groupId}/members`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.message || "Failed to load members");
+      return;
+    }
+
+    setMembers(data.members || []);
+  } catch (err) {
+    console.log(err);
+    alert("Failed to load members");
+  } finally {
+    setLoadingMembers(false);
+  }
 };
 
-const isImage = (fileName?: string) => {
-  if (!fileName) return false;
-  return /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+// Delete group
+const deleteGroup = async () => {
+  const confirmDelete = confirm("Are you sure you want to delete this group?");
+  if (!confirmDelete) return;
+
+  const res = await fetch(`${API_BASE}/api/groups/${activeGroupId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token()}`
+    }
+  });
+
+  const data = await res.json();
+
+  if (!data.success) {
+    alert(data.message || "Delete failed");
+    return;
+  }
+
+  alert("✅ Group deleted");
+
+  // UI update
+  setGroups((prev) => prev.filter((g) => g.id !== activeGroupId));
+  setActiveGroupId((prev) => {
+    const remaining = groups.filter((g) => g.id !== prev);
+    return remaining.length > 0 ? remaining[0].id : "";
+  });
+
+  setShowGroupMenu(false);
 };
+
+const inviteMember = async () => {
+  if (!invitePhone.trim()) return alert("Enter phone number");
+
+  const res = await fetch(`${API_BASE}/api/groups/invite`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token()}`
+    },
+    body: JSON.stringify({
+      groupId: activeGroupId,
+      phoneNumber: invitePhone.trim()
+    })
+  });
+
+  const data = await res.json();
+
+  if (!data.success) {
+    alert(data.message || "Invite failed");
+    return;
+  }
+
+  alert("✅ Member added");
+  setInvitePhone("");
+  fetchMembers(activeGroupId);
+};
+
+// Remove member from group
+const removeMember = async (userId: string) => {
+  const res = await fetch(`${API_BASE}/api/groups/remove-member`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token()}`
+    },
+    body: JSON.stringify({
+      groupId: activeGroupId,
+      userId
+    })
+  });
+
+  const data = await res.json();
+
+  if (!data.success) {
+    alert(data.message || "Remove failed");
+    return;
+  }
+
+  alert("✅ Member removed");
+  fetchMembers(activeGroupId);
+};
+
+  // Check if file is image
+  const isImage = (fileName?: string) => {
+    if (!fileName) return false;
+    return /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+  };
+
+  // Fetch messages for a group
+  const fetchMessages = async (groupId: string) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`http://localhost:5001/api/messages/${groupId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await res.json();
+
+  setMessages((prev) => ({
+    ...prev,
+    [groupId]: (data.messages || []).map((m: any) => ({
+      id: m._id,
+      sender: m.senderName,
+      text: m.text,
+      time: new Date(m.createdAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      }),
+      fileUrl: m.fileUrl,
+      fileName: m.fileName
+    }))
+  }));
+};
+
+  /* ================= UI ================= */
 
   return (
     <div className="flex h-full w-full bg-[#F8FAFC]">
 
-      {/* ===== LEFT: GROUPS ===== */}
+      {/* ===== LEFT: GROUP LIST ===== */}
       <aside className="w-64 bg-white p-4 shadow-[1px_0_0_0_#E0F2FE]">
         <button
-          onClick={() => {
-            const name = prompt("Enter group name");
-            if (!name) return;
-            setGroups([...groups, { id: Date.now().toString(), name }]);
-          }}
+          onClick={async () => {
+  const name = prompt("Enter group name");
+  if (!name) return;
+
+  const newGroup = await createGroup(name);
+  if (!newGroup) return;
+
+  setGroups((prev) => [...prev, newGroup]);
+  setActiveGroupId(newGroup.id);
+  fetchMessages(newGroup.id);
+}}
           className="w-full mb-3 py-2 text-sm rounded-lg border border-dashed text-gray-500 hover:bg-gray-50"
         >
           + New Group
@@ -87,7 +454,10 @@ const isImage = (fileName?: string) => {
           {groups.map((group) => (
             <li
               key={group.id}
-              onClick={() => setActiveGroupId(group.id)}
+             onClick={() => {
+  setActiveGroupId(group.id);
+  fetchMessages(group.id);
+}}
               className={`px-3 py-2 rounded-lg cursor-pointer ${
                 activeGroupId === group.id
                   ? "bg-[#E0F2FE] text-[#0369A1] font-medium"
@@ -104,12 +474,43 @@ const isImage = (fileName?: string) => {
       <main className="flex-1 flex flex-col bg-gradient-to-b from-[#F0F9FF] to-[#E0F2FE]">
 
         {/* Header */}
-        <div className="h-12 bg-white flex items-center px-6 text-sm font-medium shadow-sm">
-          📘 {activeGroup?.name}
-        </div>
+       <div className="h-12 bg-white flex items-center justify-between px-6 text-sm font-medium shadow-sm">
+  <span>📘 {activeGroup?.name}</span>
+
+  <div className="relative">
+    <button
+      onClick={() => setShowGroupMenu((p) => !p)}
+      className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-lg"
+    >
+      ⋯
+    </button>
+
+    {showGroupMenu && (
+      <div className="absolute right-0 top-10 w-44 bg-white rounded-xl shadow-lg border text-sm overflow-hidden z-50">
+        <button
+          onClick={() => {
+            setShowGroupMenu(false);
+            setShowGroupDetails(true);
+            fetchMembers(activeGroupId);
+          }}
+          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+        >
+          👥 Group Details
+        </button>
+        <button
+  onClick={deleteGroup}
+  className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600"
+>
+  🗑 Delete Group
+</button>
+      </div>
+    )}
+  </div>
+</div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 text-sm w-full">
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 text-sm">
+
           {(messages[activeGroupId] || []).map((msg) => (
             <div
               key={msg.id}
@@ -119,7 +520,7 @@ const isImage = (fileName?: string) => {
             >
               {msg.sender !== "You" && (
                 <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium">
-                  {msg.sender[0]}
+                  {msg.sender?.[0] || "?"}
                 </div>
               )}
 
@@ -132,49 +533,41 @@ const isImage = (fileName?: string) => {
               >
                 {msg.text && <p>{msg.text}</p>}
 
+                {/* FILE / IMAGE */}
                 {msg.fileUrl && (
-  <div className="mt-2">
-   {isImage(msg.fileName) ? (
-  <div className="relative inline-block">
-    <img
-      src={msg.fileUrl}
-      className="max-w-[220px] rounded-xl border shadow cursor-pointer"
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setContextMenu({
-          x: e.pageX,
-          y: e.pageY,
-          fileUrl: msg.fileUrl!,
-          fileName: msg.fileName
-        });
-      }}
-    />
-  </div>
-) : (
-      <div className="bg-white border rounded-xl px-3 py-2 flex items-center justify-between gap-3 max-w-[240px]">
-        <a
-          href={msg.fileUrl}
-          target="_blank"
-          className="flex items-center gap-2 overflow-hidden"
-        >
-          <span className="text-xl">
-            {msg.fileName?.endsWith(".pdf") ? "📄" : "📎"}
-          </span>
-          <span className="text-xs text-gray-700 truncate">
-            {msg.fileName}
-          </span>
-        </a>
-
-        <a
-          href={`http://localhost:5001/api/download/${msg.fileUrl.split("/").pop()}`}
-          className="text-xs text-[#0EA5E9] font-medium"
-        >
-          ⬇️
-        </a>
-      </div>
-    )}
-  </div>
-)}
+                  <div className="mt-2">
+                    {isImage(msg.fileName) ? (
+                      <img
+                        src={msg.fileUrl}
+                        className="max-w-[220px] rounded-xl border shadow cursor-pointer"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            x: e.pageX,
+                            y: e.pageY,
+                            fileUrl: msg.fileUrl!,
+                            fileName: msg.fileName
+                          });
+                        }}
+                      />
+                    ) : (
+                      <div className="bg-white border rounded-xl px-3 py-2 flex items-center justify-between gap-3 max-w-[240px]">
+                        <a
+                          href={msg.fileUrl}
+                          target="_blank"
+                          className="flex items-center gap-2 overflow-hidden"
+                        >
+                          <span className="text-xl">
+                            {msg.fileName?.endsWith(".pdf") ? "📄" : "📎"}
+                          </span>
+                          <span className="text-xs truncate">
+                            {msg.fileName}
+                          </span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <p className="text-[10px] text-gray-400 mt-1">
                   {msg.sender} · {msg.time}
@@ -183,86 +576,62 @@ const isImage = (fileName?: string) => {
             </div>
           ))}
 
-          {(messages[activeGroupId] || []).length === 0 && (
-            <p className="text-center text-gray-400 mt-10">
-              No messages yet. Start the conversation 🚀
-            </p>
-          )}
         </div>
 
         {/* ===== INPUT ===== */}
         <div className="bg-white px-6 py-3 shadow-[0_-1px_0_0_#E5E7EB]">
-
-          {/* FILE PREVIEW */}
+          
           {selectedFile && (
             <div className="flex items-center justify-between bg-[#E0F2FE] px-3 py-2 rounded-lg mb-2">
-              <span className="text-xs text-[#0369A1] truncate">
-                📎 {selectedFile.name}
-              </span>
-              <button
-                onClick={() => setSelectedFile(null)}
-                className="text-xs text-red-500"
-              >
-                ✕
-              </button>
+              <span className="text-xs truncate">📎 {selectedFile.name}</span>
+              <button onClick={() => setSelectedFile(null)}>✕</button>
             </div>
           )}
 
           <div className="flex items-center gap-3">
             <label className="cursor-pointer text-xl">
               📎
-              <input
-                type="file"
-                hidden
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) setSelectedFile(file);
-                }}
-              />
+              <input type="file" hidden onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setSelectedFile(file);
+              }} />
             </label>
 
             <input
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
+              className="flex-1 bg-gray-100 rounded-full px-5 py-2.5 text-sm"
               placeholder="Type a message"
-              className="flex-1 bg-gray-100 rounded-full px-5 py-2.5 text-sm
-              focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30"
             />
 
             <button
               onClick={async () => {
-                if (!chatInput.trim() && !selectedFile) return;
+                if (!chatInput && !selectedFile) return;
 
                 let fileUrl = null;
-
-                if (selectedFile) {
-                  fileUrl = await uploadFile(selectedFile);
-                }
+                if (selectedFile) fileUrl = await uploadFile(selectedFile);
 
                 const newMsg: Message = {
-  id: Date.now(),
-  sender: "You",
-  text: chatInput,
-  time: new Date().toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit"
-  }),
-  fileUrl,
-  fileName: selectedFile?.name
-};
+                  id: crypto.randomUUID(),
+                  sender: "you",
+                  text: chatInput,
+                  time: new Date().toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  }),
+                  fileUrl,
+                  fileName: selectedFile?.name
+                };
 
-                setMessages({
-                  ...messages,
-                  [activeGroupId]: [
-                    ...(messages[activeGroupId] || []),
-                    newMsg
-                  ]
-                });
+              socket.emit("send-message", {
+                groupId: activeGroupId,
+                message: newMsg
+               });
 
                 setChatInput("");
                 setSelectedFile(null);
               }}
-              className="text-[#0EA5E9] font-medium"
+              className="text-[#0EA5E9]"
             >
               Send
             </button>
@@ -270,32 +639,117 @@ const isImage = (fileName?: string) => {
         </div>
 
       </main>
+
+      {/* ===== RIGHT CLICK MENU ===== */}
       {contextMenu && (
-  <div
-    style={{ top: contextMenu.y, left: contextMenu.x }}
-    className="fixed bg-white rounded-xl shadow-lg border text-sm z-50 w-40"
-    onMouseLeave={() => setContextMenu(null)}
-  >
-    <a
-      href={contextMenu.fileUrl}
-      target="_blank"
-      className="block px-4 py-2 hover:bg-gray-100"
-    >
-      🖼 View
-    </a>
+        <div
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          className="fixed bg-white rounded-xl shadow-lg border text-sm z-50 w-40"
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          <a href={contextMenu.fileUrl} target="_blank" className="block px-4 py-2 hover:bg-gray-100">
+            🖼 View
+          </a>
+          <a
+            href={`http://localhost:5001/api/download/${contextMenu.fileUrl.split("/").pop()}`}
+            className="block px-4 py-2 hover:bg-gray-100"
+          >
+            ⬇️ Download
+          </a>
+          <div className="px-4 py-2 text-xs text-gray-500">{contextMenu.fileName}</div>
+        </div>
+      )}
 
-    <a
-      href={`http://localhost:5001/api/download/${contextMenu.fileUrl.split("/").pop()}`}
-      className="block px-4 py-2 hover:bg-gray-100"
-    >
-      ⬇️ Download
-    </a>
+      {showGroupDetails && (
+  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="bg-white w-[420px] rounded-2xl p-6 shadow-xl space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-[#0F172A]">👥 Group Details</h2>
+        
+        {/* <button
+          onClick={() => setShowGroupDetails(false)}
+          className="text-gray-500 hover:text-black"
+        >
+          ✕
+        </button> */}
+      </div>
 
-    <div className="px-4 py-2 text-xs text-gray-500">
-      {contextMenu.fileName}
+      {/* Group name */}
+      <div className="bg-[#F8FAFC] border rounded-xl p-4">
+        <p className="text-sm text-gray-500">Group</p>
+        <p className="text-base font-semibold text-[#0F172A]">
+          {activeGroup?.name}
+        </p>
+      </div>
+
+      {/* Invite */}
+      <div>
+        <p className="text-sm font-medium text-[#0F172A] mb-2">
+          Invite Member (Phone)
+        </p>
+
+        <div className="flex gap-2">
+          <input
+            value={invitePhone}
+            onChange={(e) => setInvitePhone(e.target.value)}
+            placeholder="Enter phone number"
+            className="flex-1 border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30"
+          />
+          <button
+            onClick={inviteMember}
+            className="bg-[#0EA5E9] text-white px-4 py-2 rounded-xl text-sm hover:bg-[#0284C7]"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Members */}
+      <div>
+        <p className="text-sm font-medium text-[#0F172A] mb-2">Members</p>
+
+        {loadingMembers ? (
+          <p className="text-sm text-gray-500">Loading members...</p>
+        ) : (
+          <div className="max-h-52 overflow-y-auto space-y-2">
+            {members.map((m) => (
+              <div
+                key={m._id}
+                className="flex items-center justify-between bg-[#F8FAFC] border rounded-xl px-3 py-2"
+              >
+                <div className="overflow-hidden">
+                  <p className="text-sm font-medium truncate">{m.name || "User"}</p>
+                  <p className="text-xs text-gray-500 truncate">{m.phoneNumber}</p>
+                </div>
+
+                <button
+                  onClick={() => removeMember(m._id)}
+                  className="text-xs text-red-500 hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+
+            {members.length === 0 && (
+              <p className="text-xs text-gray-400">No members yet.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-2 flex justify-end">
+        <button
+          onClick={() => setShowGroupDetails(false)}
+          className="px-4 py-2 rounded-xl text-sm bg-gray-100 hover:bg-gray-200"
+        >
+          Close
+        </button>
+      </div>
     </div>
   </div>
 )}
+
     </div>
   );
 }
