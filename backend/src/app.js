@@ -12,6 +12,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// group routes
+const groupRoutes = require("./routes/group.routes");
+app.use("/api/groups", groupRoutes);
+
 // const authRoutes = require("./routes/auth.routes");
 
 // routes
@@ -36,8 +40,12 @@ const groupAnalyticsRoutes = require("./routes/groupAnalytics.routes");
 app.use("/api/group-analytics", groupAnalyticsRoutes);
 
 // group routes
-const groupRoutes = require("./routes/group.routes");
-app.use("/api/groups", groupRoutes);
+// const groupRoutes = require("./routes/group.routes");
+// app.use("/api/groups", groupRoutes);
+
+//  message routes
+const messageRoutes = require("./routes/message.routes");
+app.use("/api/messages", messageRoutes);
 
 // group study routes
 const groupStudyRoutes = require("./routes/groupStudy.routes");
