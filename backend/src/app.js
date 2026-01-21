@@ -12,11 +12,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// message routes
+const messageRoutes = require("./routes/message.routes");
+app.use("/api/messages", messageRoutes);
+
 // group routes
 const groupRoutes = require("./routes/group.routes");
 app.use("/api/groups", groupRoutes);
-
-// const authRoutes = require("./routes/auth.routes");
 
 // routes
 app.use("/api/auth", authRoutes);
@@ -44,12 +46,16 @@ app.use("/api/group-analytics", groupAnalyticsRoutes);
 // app.use("/api/groups", groupRoutes);
 
 //  message routes
-const messageRoutes = require("./routes/message.routes");
-app.use("/api/messages", messageRoutes);
+// const messageRoutes = require("./routes/message.routes");
+// app.use("/api/messages", messageRoutes);
 
 // group study routes
 const groupStudyRoutes = require("./routes/groupStudy.routes");
 app.use("/api/group-study", groupStudyRoutes);
+
+// streak routes
+const streakRoutes = require("./routes/streak.routes");
+app.use("/api/streak", streakRoutes);
 
 // notification routes
 // const notificationRoutes = require("./routes/notification.routes");
@@ -60,6 +66,10 @@ app.use("/api/upload", require("./routes/upload.routes"));
 app.use("/uploads", express.static("uploads"));
 // download routes
 app.use("/api/download", require("./routes/download.routes"));
+
+// focus routes
+const focusRoutes = require("./routes/focus.routes");
+app.use("/api/focus", focusRoutes);
 
 // test route
 app.get("/", (req, res) => {

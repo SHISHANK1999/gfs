@@ -6,6 +6,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const Group = require("./src/models/Group"); // 🔥 THIS WAS MISSING
 const Message = require("./src/models/Message");
+const jwt = require("jsonwebtoken");
 
 const PORT = process.env.PORT || 5001;
 
@@ -31,45 +32,101 @@ io.on("connection", (socket) => {
   });
 
   // ✅ Send Message
-  socket.on("send-message", async ({ groupId, message }) => {
-  try {
-    // ✅ 1) Save in DB
-    const savedMessage = await Message.create({
-      groupId,
-      senderId: message.senderId, // optional
-      senderName: message.sender || "User",
-      text: message.text || "",
-      fileUrl: message.fileUrl || null,
-      fileName: message.fileName || null
-    });
-
-    // ✅ 2) Broadcast inside group
-    io.to(groupId).emit("receive-message", {
-      groupId,
-      message: {
-        id: savedMessage._id,
-        sender: savedMessage.senderName,
-        text: savedMessage.text,
-        time: new Date(savedMessage.createdAt).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        }),
-        fileUrl: savedMessage.fileUrl,
-        fileName: savedMessage.fileName
+   socket.on("send-message", async ({ groupId, message }) => {
+    try {
+      // ✅ Token from client
+      const token = message?.token;
+      if (!token) {
+        return console.log("❌ Token missing in socket message");
       }
-    });
 
-    // ✅ 3) Notify others
-    socket.broadcast.emit("notify", {
-      groupId,
-      text: savedMessage.text || "📎 New file received"
-    });
-  } catch (err) {
-    console.log("Send message error:", err.message);
-  }
+      // ✅ Decode token → get userId
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const senderId = decoded.userId;
+
+      // ✅ Save message in DB
+      const saved = await Message.create({
+        groupId,
+        senderId,
+        senderName: message.senderName || "User",
+        text: message.text || "",
+        fileUrl: message.fileUrl || null,
+        fileName: message.fileName || null
+      });
+
+      // ✅ Emit back to group
+      io.to(groupId).emit("receive-message", {
+        groupId,
+        message: {
+          id: saved._id.toString(),
+          sender: message.senderName || "User",
+          text: saved.text,
+          time: new Date(saved.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+          }),
+          fileUrl: saved.fileUrl,
+          fileName: saved.fileName
+        }
+      });
+      // ✅ 3) Notify others
+   socket.broadcast.emit("notify", {
+  type: "NEW_MESSAGE",
+  groupId,
+  text: saved.text?.trim() ? `💬 New message: ${saved.text}` : "📎 New file received"
 });
 
-  // ✅ Focus Session Notification (FIXED ✅)
+    } catch (err) {
+      console.log("Send message error:", err.message);
+    }
+  });
+
+  // ✅ Delete Message
+  socket.on("delete-message", ({ groupId, messageId }) => {
+  io.to(groupId).emit("message-deleted", { groupId, messageId });
+});
+//   socket.on("send-message", async ({ groupId, message }) => {
+//   try {
+//     // ✅ 1) Save into MongoDB
+//     const saved = await Message.create({
+//       groupId,
+//       senderId: message.senderId, // frontend must send this
+//       senderName: message.senderName || "User",
+//       text: message.text || "",
+//       fileUrl: message.fileUrl || null,
+//       fileName: message.fileName || null
+//     });
+
+//     // ✅ 2) Broadcast inside group
+//     io.to(groupId).emit("receive-message", {
+//       groupId,
+//       message: {
+//         id: saved._id.toString(),
+//         sender: message.senderName || "User",
+//         text: saved.text,
+//         time: new Date(saved.createdAt).toLocaleTimeString([], {
+//           hour: "2-digit",
+//           minute: "2-digit"
+//         }),
+//         fileUrl: saved.fileUrl,
+//         fileName: saved.fileName
+//       }
+//     });
+
+//     // ✅ 3) Notify others
+//     socket.broadcast.emit("notify", {
+//       groupId,
+//       text: savedMessage.text || "📎 New file received"
+//     });
+//   } catch (err) {
+//     console.log("Send message error:", err.message);
+//   }
+// });
+
+ 
+
+ 
+// ✅ Focus Session Notification (FIXED ✅)
   socket.on("start-focus", ({ groupId, user, duration, subject }) => {
     console.log("🔥 FOCUS START:", groupId, user, duration, subject);
 

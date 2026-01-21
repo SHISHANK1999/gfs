@@ -1,21 +1,23 @@
 "use client";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { socket } from "../lib/socket";
 
 /* ================= TYPES ================= */
 
 type Message = {
-  id: string;
+  _id?: string;
+  id?: string; // old support
   sender: string;
+  senderId?: string;
   text?: string;
   time: string;
   fileUrl?: string | null;
   fileName?: string;
+   isMine?: boolean;
 };
 
 type Group = {
-  id: string;
+  _id: string;
   name: string;
 };
 
@@ -26,11 +28,27 @@ type Member = {
 };
 
 /* ================= COMPONENT ================= */
+const getUserIdFromToken = () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.userId; // ✅ तुम backend में यही भेज रहे हो
+  } catch (err) {
+    return null;
+  }
+};
 
 export default function ChatPanel() {
 
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const senderId = getUserIdFromToken();
+  const senderName = "Shishank";
+
   /* ===== Groups ===== */
  const [groups, setGroups] = useState<Group[]>([]);
+
  useEffect(() => {
   const fetchGroups = async () => {
     const token = localStorage.getItem("token");
@@ -59,7 +77,42 @@ export default function ChatPanel() {
   fetchGroups();
 }, []);
 
-  const [activeGroupId, setActiveGroupId] = useState("");
+const createGroup = async (name: string) => {
+   if (creatingGroup) return;
+
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("http://localhost:5001/api/groups", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ name })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.message || "Group create failed");
+      return;
+    }
+
+    // ✅ add new group instantly in sidebar
+    setGroups((prev) => [data.group, ...prev]);
+
+    // ✅ auto open that group
+    setActiveGroupId(data.group._id);
+  } catch (err) {
+    console.log("Create group error:", err);
+  }finally {
+    setCreatingGroup(false);
+  }
+};
+
+
+const [activeGroupId, setActiveGroupId] = useState<string>("");
   useEffect(() => {
   const fetchGroups = async () => {
     try {
@@ -93,12 +146,13 @@ export default function ChatPanel() {
 }, []);
 
  /* ===== CHAT STATE ===== */
-  const [messages, setMessages] = useState<Record<string, Message[]>>({ });
+
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
   const [chatInput, setChatInput] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showGroupDetails, setShowGroupDetails] = useState(false);
-
+  const [creatingGroup, setCreatingGroup] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [invitePhone, setInvitePhone] = useState("");
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -111,10 +165,12 @@ export default function ChatPanel() {
     fileName?: string;
      } | null>(null);
 
+const activeGroup = groups.find((g: any) => (g._id || g.id) === activeGroupId);
 
-  const activeGroup = groups.find((g) => g.id === activeGroupId);
-// soket checking
+  /* ================= SOCKET ================= */
+
 useEffect(() => {
+  if (!activeGroupId) return;
   socket.emit("join-group", activeGroupId);
 }, [activeGroupId]);
 
@@ -134,10 +190,15 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  const handleReceive = ({ groupId, message }) => {
+  const handleReceive = ({ groupId, message }: any) => {
+    const fixedMsg = {
+      ...message,
+      isMine: message.senderName === senderName || message.sender === "You"
+    };
+
     setMessages((prev) => ({
       ...prev,
-      [groupId]: [...(prev[groupId] || []), message]
+      [groupId]: [...(prev[groupId] || []), fixedMsg]
     }));
   };
 
@@ -161,6 +222,7 @@ useEffect(() => {
     socket.off("notify", handleNotify);
   };
 }, [activeGroupId]);
+
   /* ================= SOCKET ================= */
 // useEffect(() => {
 //   const onReceiveMessage = ({ groupId, message }) => {
@@ -244,30 +306,30 @@ useEffect(() => {
 //   };
 // }, []);
   /* ================= HELPERS ================= */
-const createGroup = async (name: string) => {
-  const token = localStorage.getItem("token");
+// const createGroup = async (name: string) => {
+//   const token = localStorage.getItem("token");
 
-  const res = await fetch("http://localhost:5001/api/groups/create", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({ name })
-  });
+//   const res = await fetch("http://localhost:5001/api/groups/create", {
+//     method: "POST",
+//     headers: {
+//       "Content-Type": "application/json",
+//       Authorization: `Bearer ${token}`
+//     },
+//     body: JSON.stringify({ name })
+//   });
 
-  const data = await res.json();
+//   const data = await res.json();
 
-  if (!data.success) {
-    alert(data.message || "Group create failed");
-    return null;
-  }
+//   if (!data.success) {
+//     alert(data.message || "Group create failed");
+//     return null;
+//   }
 
-  return {
-    id: data.group._id,
-    name: data.group.name
-  };
-};
+//   return {
+//     id: data.group._id,
+//     name: data.group.name
+//   };
+// };
   // Upload file to backend
   const uploadFile = async (file: File) => {
     const formData = new FormData();
@@ -281,6 +343,48 @@ const createGroup = async (name: string) => {
     const data = await res.json();
     return "http://localhost:5001" + data.fileUrl;
   };
+
+  useEffect(() => {
+  bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [activeGroupId, messages[activeGroupId]?.length]);
+
+  // Fetch group members
+  useEffect(() => {
+  fetchGroups();
+}, []); 
+
+  const fetchGroups = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("http://localhost:5001/api/groups", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      console.log("Fetch groups failed:", data.message);
+      return;
+    }
+
+    setGroups(data.groups || []);
+
+    // ✅ auto-select first group
+    if (data.groups?.length > 0) {
+  const firstGroupId = data.groups[0]._id;
+
+  setActiveGroupId(firstGroupId);
+
+  // ✅ group set होते ही messages भी load करा दो
+  fetchMessages(firstGroupId);
+}
+  } catch (err) {
+    console.log("Fetch groups error:", err);
+  }
+};
 
   const API_BASE = "http://localhost:5001";
 const token = () => localStorage.getItem("token");
@@ -324,11 +428,20 @@ const deleteGroup = async () => {
   const data = await res.json();
 
   if (!data.success) {
-    alert(data.message || "Delete failed");
-    return;
-  }
+  alert(data.message || "Delete failed");
+  return;
+}
 
-  alert("✅ Group deleted");
+setGroups((prev) => prev.filter((g) => g._id !== activeGroupId));
+setActiveGroupId("");
+
+// if (activeGroupId === groupId) {
+//   setActiveGroupId("");
+// }
+
+await fetchGroups();
+
+alert("✅ Group deleted");
 
   // UI update
   setGroups((prev) => prev.filter((g) => g.id !== activeGroupId));
@@ -367,6 +480,49 @@ const inviteMember = async () => {
   fetchMembers(activeGroupId);
 };
 
+// Delete message
+const handleDeleteMessage = async (msg: Message) => {
+  const messageId = msg._id || msg.id;
+  if (!messageId) return;
+
+  const ok = confirm("Delete this message?");
+  if (!ok) return;
+
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.message || "Delete failed");
+      return;
+    }
+
+    // ✅ remove locally
+    setMessages((prev) => ({
+      ...prev,
+      [activeGroupId]: (prev[activeGroupId] || []).filter(
+        (m) => (m._id || m.id) !== messageId
+      )
+    }));
+
+    // ✅ realtime delete
+    socket.emit("delete-message", {
+      groupId: activeGroupId,
+      messageId
+    });
+  } catch (err) {
+    console.log("Delete message error:", err);
+  }
+};
+
 // Remove member from group
 const removeMember = async (userId: string) => {
   const res = await fetch(`${API_BASE}/api/groups/remove-member`, {
@@ -380,6 +536,38 @@ const removeMember = async (userId: string) => {
       userId
     })
   });
+
+  // Fetch messages for a group
+  const fetchMessages = async (groupId: string) => {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`http://localhost:5001/api/messages/${groupId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  const data = await res.json();
+
+  if (!data.success) return;
+
+  const mapped = (data.messages || []).map((m: any) => ({
+    id: m._id,
+    sender: m.senderName || "User",
+    text: m.text,
+    time: new Date(m.createdAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    }),
+    fileUrl: m.fileUrl,
+    fileName: m.fileName
+  }));
+
+  setMessages((prev) => ({
+    ...prev,
+    [groupId]: mapped
+  }));
+};
 
   const data = await res.json();
 
@@ -414,7 +602,8 @@ const removeMember = async (userId: string) => {
     ...prev,
     [groupId]: (data.messages || []).map((m: any) => ({
       id: m._id,
-      sender: m.senderName,
+      sender: m.senderName || "User",
+      senderId: m.senderId,
       text: m.text,
       time: new Date(m.createdAt).toLocaleTimeString([], {
         hour: "2-digit",
@@ -434,39 +623,39 @@ const removeMember = async (userId: string) => {
       {/* ===== LEFT: GROUP LIST ===== */}
       <aside className="w-64 bg-white p-4 shadow-[1px_0_0_0_#E0F2FE]">
         <button
-          onClick={async () => {
-  const name = prompt("Enter group name");
-  if (!name) return;
+  disabled={creatingGroup}
+  onClick={() => {
+    if (creatingGroup) return;
 
-  const newGroup = await createGroup(name);
-  if (!newGroup) return;
+    const name = prompt("Enter group name");
+    if (!name) return;
 
-  setGroups((prev) => [...prev, newGroup]);
-  setActiveGroupId(newGroup.id);
-  fetchMessages(newGroup.id);
-}}
-          className="w-full mb-3 py-2 text-sm rounded-lg border border-dashed text-gray-500 hover:bg-gray-50"
-        >
-          + New Group
-        </button>
+    createGroup(name);
+  }}
+  className={`w-full mb-3 py-2 text-sm rounded-lg border border-dashed text-gray-500 hover:bg-gray-50 ${
+    creatingGroup ? "opacity-60 cursor-not-allowed" : ""
+  }`}
+>
+  {creatingGroup ? "Creating..." : "+ New Group"}
+</button>
 
         <ul className="space-y-1 text-sm">
-          {groups.map((group) => (
-            <li
-              key={group.id}
-             onClick={() => {
-  setActiveGroupId(group.id);
-  fetchMessages(group.id);
+         {groups.map((group,index) => (
+  <li
+    key={group._id || `${group.name}-${index}`}
+    onClick={() => {
+  setActiveGroupId(group._id);
+  fetchMessages(group._id);
 }}
-              className={`px-3 py-2 rounded-lg cursor-pointer ${
-                activeGroupId === group.id
-                  ? "bg-[#E0F2FE] text-[#0369A1] font-medium"
-                  : "hover:bg-gray-100"
-              }`}
-            >
-              📘 {group.name}
-            </li>
-          ))}
+    className={`px-3 py-2 rounded-lg cursor-pointer ${
+      activeGroupId === group._id
+        ? "bg-[#E0F2FE] text-[#0369A1] font-medium"
+        : "hover:bg-gray-100"
+    }`}
+  >
+    📘 {group.name}
+  </li>
+))}
         </ul>
       </aside>
 
@@ -520,6 +709,7 @@ const removeMember = async (userId: string) => {
             >
               {msg.sender !== "You" && (
                 <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium">
+                  
                   {msg.sender?.[0] || "?"}
                 </div>
               )}
@@ -532,6 +722,15 @@ const removeMember = async (userId: string) => {
                 }`}
               >
                 {msg.text && <p>{msg.text}</p>}
+                {/* ✅ Delete button (text + file both) */}
+{msg.senderId && senderId && msg.senderId === senderId && (
+  <button
+    onClick={() => handleDeleteMessage(msg)}
+    className="mt-2 text-[10px] text-red-500 hover:underline"
+  >
+    Delete
+  </button>
+)}
 
                 {/* FILE / IMAGE */}
                 {msg.fileUrl && (
@@ -572,10 +771,13 @@ const removeMember = async (userId: string) => {
                 <p className="text-[10px] text-gray-400 mt-1">
                   {msg.sender} · {msg.time}
                 </p>
-              </div>
+               
+</div>
             </div>
           ))}
 
+        
+        <div ref={bottomRef} />
         </div>
 
         {/* ===== INPUT ===== */}
@@ -611,17 +813,35 @@ const removeMember = async (userId: string) => {
                 let fileUrl = null;
                 if (selectedFile) fileUrl = await uploadFile(selectedFile);
 
-                const newMsg: Message = {
-                  id: crypto.randomUUID(),
-                  sender: "you",
-                  text: chatInput,
-                  time: new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  }),
-                  fileUrl,
-                  fileName: selectedFile?.name
-                };
+                // const newMsg: any = {
+                //   id: crypto.randomUUID(),
+                //   sender: "you",
+                //   // senderId: senderId,
+                //   senderName: Shishank,
+                //   text: chatInput,
+                //   time: new Date().toLocaleTimeString([], {
+                //     hour: "2-digit",
+                //     minute: "2-digit"
+                //   }),
+                //   fileUrl,
+                //   fileName: selectedFile?.name
+                //    token: localStorage.getItem("token")
+                // };
+                const newMsg: any = {
+  id: crypto.randomUUID(),
+  senderId: senderId, 
+  senderName: senderName, 
+  sender: senderName,
+  text: chatInput,
+  time: new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  }),
+  fileUrl,
+  fileName: selectedFile?.name,
+   isMine: true,
+  token: localStorage.getItem("token")
+};
 
               socket.emit("send-message", {
                 groupId: activeGroupId,

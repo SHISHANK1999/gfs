@@ -18,23 +18,33 @@ const userSchema = new mongoose.Schema(
       default: 0
     },
 
-    dailyStudyTarget: {
-      type: Number, // minutes
-      default: 60
+    lastStudyDate: {
+      type: String, // ✅ "2026-01-21"
+      default: null
     },
 
-    lastStudyAt: {
-      type: Date
+    todayStudyMinutes: {
+      type: Number,
+      default: 0
+    },
+
+    totalStudyMinutes: {
+      type: Number,
+      default: 0
+    },
+
+    dailyStudyTarget: {
+      type: Number,
+      default: 60
     },
 
     isActive: {
       type: Boolean,
       default: true
     },
-    
-    // 🔔 Notification preferences
+
     preferredStudyTime: {
-      type: String, // "19:00"
+      type: String,
       default: "19:00"
     },
 

@@ -1,14 +1,15 @@
-const express = require("express");
-const router = express.Router();
-const authMiddleware = require("../middlewares/auth.middleware");
-const {
-  startGroupStudy,
-  joinGroupStudy,
-  endGroupStudy
-} = require("../controllers/groupStudy.controller");
+const router = require("express").Router();
+const auth = require("../middlewares/auth.middleware");
 
-router.post("/start", authMiddleware, startGroupStudy);
-router.post("/join", authMiddleware, joinGroupStudy);
-router.post("/end", authMiddleware, endGroupStudy);
+const groupStudyController = require("../controllers/groupStudy.controller");
+
+// ✅ Start group study
+router.post("/start", auth, groupStudyController.startGroupStudy);
+
+// ✅ Join group study
+router.post("/join", auth, groupStudyController.joinGroupStudy);
+
+// ✅ End group study (🔥 THIS WAS MISSING)
+router.post("/end", auth, groupStudyController.endGroupStudy);
 
 module.exports = router;

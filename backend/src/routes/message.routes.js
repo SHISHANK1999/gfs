@@ -8,4 +8,7 @@ router.post("/", auth, messageController.sendMessage);
 // Get message history of a group
 router.get("/:groupId", auth, messageController.getGroupMessages);
 
+// ✅ delete message
+router.delete("/:messageId", auth, messageController.deleteMessage);
+
 module.exports = router;
