@@ -19,46 +19,50 @@ export default function VerifyOtpPage() {
     }
   }, [router]);
 
-  const verifyOtp = async () => {
-    if (!otp) {
-      alert("Enter OTP");
+ const verifyOtp = async () => {
+  if (!otp.trim()) {
+    alert("Enter OTP");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const phone = localStorage.getItem("phoneNumber");
+    const name = localStorage.getItem("name"); // ✅ profile/signup page se set hona chahiye
+
+    const res = await fetch("http://localhost:5001/api/auth/verify-otp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phoneNumber: phone,
+        otp,
+        name: name || "User" // ✅ fallback
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      alert(data.message || "OTP verification failed");
       return;
     }
 
-    try {
-      setLoading(true);
+    // ✅ Save token + user info
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userId", data.user._id);
+    localStorage.setItem("name", data.user.name);
 
-      const res = await fetch(
-        "https://gfs-backend-0sy3.onrender.com/api/auth/verify-otp",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            phoneNumber: phone,
-            otp,
-            name: "User"
-          })
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || "OTP verification failed");
-        return;
-      }
-
-      localStorage.setItem("token", data.token);
-      router.push("/profile");
-    } catch (error) {
-      alert("Backend waking up, try again");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+    alert("✅ Login Successful");
+    router.push("/dashboard");
+  } catch (error) {
+    alert("Backend issue, try again");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <>
     {loading && <LoadingOverlay text="Verifying OTP..." />}

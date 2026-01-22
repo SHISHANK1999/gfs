@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
@@ -8,40 +8,49 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  
+ useEffect(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("name");
+    localStorage.removeItem("phoneNumber");
+  }, []);
 
   const sendOtp = async () => {
-    if (!phone) {
-      alert("Please enter phone number");
+  if (!phone.trim()) {
+    alert("Please enter phone number");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const res = await fetch(
+      "https://gfs-backend-0sy3.onrender.com/api/auth/send-otp",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: phone.trim() })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      alert(data.message || "Failed to send OTP");
       return;
     }
 
-    try {
-      setLoading(true);
+    // ✅ only phone save here
+    localStorage.setItem("phoneNumber", phone.trim());
 
-      const res = await fetch(
-        "https://gfs-backend-0sy3.onrender.com/api/auth/send-otp",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ phoneNumber: phone })
-        }
-      );
-
-      if (!res.ok) {
-        alert("Server is starting, please try again");
-        return;
-      }
-
-      localStorage.setItem("phoneNumber", phone);
-      router.push("/verify-otp");
-    } catch (error) {
-      alert("Backend waking up, try again in few seconds");
-    } finally {
-      setLoading(false);
-    }
-  };
+    router.push("/verify-otp");
+  } catch (error) {
+    alert("Backend waking up, try again in few seconds");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <>

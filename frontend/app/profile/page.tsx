@@ -22,9 +22,8 @@ export default function ProfilePage() {
     }
 
     // Temporary local save (backend baad me)
-    localStorage.setItem("userName", name);
-    localStorage.setItem("studyPurpose", purpose);
-
+     localStorage.setItem("name", name);
+     localStorage.setItem("studyPurpose", purpose);
     router.push("/dashboard");
   };
 

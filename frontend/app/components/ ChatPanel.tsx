@@ -156,6 +156,7 @@ const [activeGroupId, setActiveGroupId] = useState<string>("");
   const [members, setMembers] = useState<Member[]>([]);
   const [invitePhone, setInvitePhone] = useState("");
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
  /* ===== CONTEXT MENU ===== */
   const [contextMenu, setContextMenu] = useState<{
@@ -169,9 +170,50 @@ const activeGroup = groups.find((g: any) => (g._id || g.id) === activeGroupId);
 
   /* ================= SOCKET ================= */
 
+// ✅ Join active group room
 useEffect(() => {
   if (!activeGroupId) return;
   socket.emit("join-group", activeGroupId);
+}, [activeGroupId]);
+
+// ✅ Receive messages + Unread count
+useEffect(() => {
+  const handleReceive = ({ groupId, message }: any) => {
+    const incomingId = message?._id || message?.id;
+
+    setMessages((prev) => {
+      const oldMessages = prev[groupId] || [];
+
+      // ✅ Duplicate check
+      const alreadyExists = oldMessages.some((m: any) => {
+        const oldId = m?._id || m?.id;
+        return oldId && incomingId && oldId === incomingId;
+      });
+
+      // ✅ agar message already hai to kuch mat karo
+      if (alreadyExists) return prev;
+
+      // ✅ new message add
+      return {
+        ...prev,
+        [groupId]: [...oldMessages, message]
+      };
+    });
+
+    // ✅ unread increase ONLY when new msg actually came + other group
+    if (groupId !== activeGroupId) {
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [groupId]: (prev[groupId] || 0) + 1
+      }));
+    }
+  };
+
+  socket.on("receive-message", handleReceive);
+
+  return () => {
+    socket.off("receive-message", handleReceive);
+  };
 }, [activeGroupId]);
 
 useEffect(() => {
@@ -223,88 +265,7 @@ useEffect(() => {
   };
 }, [activeGroupId]);
 
-  /* ================= SOCKET ================= */
-// useEffect(() => {
-//   const onReceiveMessage = ({ groupId, message }) => {
-//     setMessages((prev) => ({
-//       ...prev,
-//       [groupId]: [...(prev[groupId] || []), message]
-//     }));
-//   };
 
-//   const onNotify = (data) => {
-//     // ❗ notify तभी दिखाओ जब group active न हो
-//     if (data.groupId !== activeGroupId) {
-//       alert("🔔 " + data.text);
-//     }
-//   };
-
-//   const onFocusStarted = (data) => {
-//     alert(`🔥 ${data.user} started ${data.subject}`);
-//   };
-
-//   socket.on("receive-message", onReceiveMessage);
-//   socket.on("notify", onNotify);
-//   socket.on("focus-started", onFocusStarted);
-
-//   return () => {
-//     socket.off("receive-message", onReceiveMessage);
-//     socket.off("notify", onNotify);
-//     socket.off("focus-started", onFocusStarted);
-//   };
-// }, [activeGroupId]);
-// // join your personal user room (one time)
-// useEffect(() => {
-//   const userId = "Shishank"; // later real user id
-//   socket.emit("join-user", userId);
-// }, []);
-
-// // join active group room
-// useEffect(() => {
-//   socket.emit("join-group", activeGroupId);
-// }, [activeGroupId]);
-
-// // listen for all events
-// useEffect(() => {
-
-//   // group chat messages
-//   const handler = ({ groupId, message }) => {
-//     // setMessages((prev) => {
-//     //   const old = prev[groupId] || [];
-
-//     //   return {
-//     //     ...prev,
-//     //     [groupId]: [...old, message]
-//     //   };
-//     // });
-//   };
-//   socket.on("receive-message", handler);
-
-  
-
-//   socket.on("receive-message", ({ groupId, message }) => {
-//     setMessages((prev) => ({
-//       ...prev,
-//       [groupId]: [...(prev[groupId] || []), message]
-//     }));
-//   });
-
-//   // background notifications (other groups)
-//   socket.on("notify", (data) => {
-//     alert("🔔 " + data.text);
-//   });
-
-//   // focus started alert
-//   socket.on("focus-started", (data) => {
-//     alert(`🔥 ${data.user} started ${data.subject} (${data.duration} min)`);
-//   });
-
-//   return () => {
-//     socket.off("receive-message");
-//     socket.off("notify");
-//     socket.off("focus-started");
-//   };
-// }, []);
   /* ================= HELPERS ================= */
 // const createGroup = async (name: string) => {
 //   const token = localStorage.getItem("token");
@@ -563,10 +524,29 @@ const removeMember = async (userId: string) => {
     fileName: m.fileName
   }));
 
-  setMessages((prev) => ({
+  setMessages((prev) => {
+  const oldMessages = prev[groupId] || [];
+
+  // ✅ new list from api
+  const newMessages = mapped;
+
+  const merged = [...oldMessages];
+
+  newMessages.forEach((nm: any) => {
+    const nmId = nm._id || nm.id;
+    const exists = merged.some((om: any) => {
+      const omId = om._id || om.id;
+      return omId && nmId && omId === nmId;
+    });
+
+    if (!exists) merged.push(nm);
+  });
+
+  return {
     ...prev,
-    [groupId]: mapped
-  }));
+    [groupId]: merged
+  };
+});
 };
 
   const data = await res.json();
@@ -640,20 +620,33 @@ const removeMember = async (userId: string) => {
 </button>
 
         <ul className="space-y-1 text-sm">
-         {groups.map((group,index) => (
+       {groups.map((group, index) => (
   <li
     key={group._id || `${group.name}-${index}`}
     onClick={() => {
-  setActiveGroupId(group._id);
-  fetchMessages(group._id);
-}}
-    className={`px-3 py-2 rounded-lg cursor-pointer ${
+      setActiveGroupId(group._id);
+      fetchMessages(group._id);
+
+      // ✅ unread reset when opening the group
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [group._id]: 0
+      }));
+    }}
+    className={`px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between ${
       activeGroupId === group._id
         ? "bg-[#E0F2FE] text-[#0369A1] font-medium"
         : "hover:bg-gray-100"
     }`}
   >
-    📘 {group.name}
+    <span className="truncate">📘 {group.name}</span>
+
+    {/* ✅ UNREAD BADGE */}
+    {unreadCounts[group._id] > 0 && (
+      <span className="min-w-[22px] h-[22px] px-2 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-semibold">
+        {unreadCounts[group._id]}
+      </span>
+    )}
   </li>
 ))}
         </ul>
@@ -700,9 +693,9 @@ const removeMember = async (userId: string) => {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 text-sm">
 
-          {(messages[activeGroupId] || []).map((msg) => (
+          {(messages[activeGroupId] || []).map((msg, idx) => (
             <div
-              key={msg.id}
+              key={`${msg._id || msg.id}-${idx}`}
               className={`flex ${
                 msg.sender === "You" ? "justify-end" : "items-start gap-2"
               }`}

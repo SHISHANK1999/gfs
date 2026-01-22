@@ -7,8 +7,18 @@ import { socket } from "../lib/socket";
 export default function DashboardPage() {
   const router = useRouter();
 
+// const userName = localStorage.getItem("name") || "User";
+const userRole = "Student • MCA • GFS";
+const [profileName, setProfileName] = useState("User");
+
+useEffect(() => {
+  const savedName = localStorage.getItem("name");
+  if (savedName) setProfileName(savedName);
+}, []);
+
   /* ================= GLOBAL APP STATE ================= */
   const [showProfile, setShowProfile] = useState(false);
+  const [userName, setUserName] = useState("User");
 
   // ✅ Single source of truth for selected group (ChatPanel + Focus both use this)
   const [activeGroupId, setActiveGroupId] = useState("1");
@@ -107,6 +117,11 @@ export default function DashboardPage() {
     setTimeout(() => setToast(null), 2500);
   };
 
+  useEffect(() => {
+  const name = localStorage.getItem("name");
+  if (name) setUserName(name);
+}, []);
+
   return (
     <div className="relative h-screen flex flex-col bg-[#F8FAFC]">
       {/* ================= FOCUS GLOW ================= */}
@@ -118,16 +133,23 @@ export default function DashboardPage() {
 
       {/* ================= TOP BAR ================= */}
       <div className="relative z-10 h-14 bg-white flex items-center justify-between px-6 shadow-sm">
-        {/* Profile */}
-        <div className="flex items-center gap-3">
-          <div
-            onClick={() => setShowProfile(!showProfile)}
-            className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium cursor-pointer"
-          >
-            S
-          </div>
-          <span className="text-sm font-medium">Shishank</span>
-        </div>
+      {/* Profile */}
+<div className="relative flex items-center gap-3">
+  <button
+    onClick={() => setShowProfile((p) => !p)}
+    className="flex items-center gap-3 px-3 py-1.5 rounded-2xl bg-white/70 backdrop-blur border border-gray-200 shadow-sm hover:shadow-md hover:bg-white transition" >
+   <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium cursor-pointer">
+  {profileName?.[0]?.toUpperCase() || "U"}
+</div>
+
+    <div className="leading-tight text-left hidden sm:block">
+      <span className="text-sm font-medium">{profileName}</span>
+     <p className="text-[11px] text-gray-500">Focus • Chat • Streak</p>
+    </div>
+
+    <span className="text-gray-400 text-sm">▾</span>
+  </button>
+</div>
 
         {/* Focus */}
         <div className="flex items-center gap-4">
@@ -208,22 +230,115 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ================= PROFILE MENU ================= */}
-      {showProfile && (
-        <div className="absolute top-14 left-6 w-60 bg-white rounded-xl shadow-xl p-4 z-50">
-          <p className="text-sm font-medium mb-3">Shishank</p>
+     {/* ================= PROFILE MENU ================= */}
+{showProfile && (
+  <>
+    {/* ✅ outside click close */}
+    <div
+      className="fixed inset-0 z-40"
+      onClick={() => setShowProfile(false)}
+    />
 
-          <button
-            onClick={() => {
-              localStorage.removeItem("token");
-              router.push("/login");
-            }}
-            className="text-sm text-red-500"
-          >
-            Logout
-          </button>
+   <div className="absolute top-14 left-6 w-[290px] bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl z-50 overflow-hidden ring-1 ring-black/5">
+      {/* Header */}
+      <div className="p-4 flex items-center gap-3">
+        
+
+<div className="w-10 h-10 rounded-full bg-[#E0F2FE] text-[#0369A1] flex items-center justify-center font-semibold">
+  {userName?.[0]?.toUpperCase() || "U"}
+</div>
+
+<div className="flex-1">
+  <p className="text-sm font-semibold text-[#0F172A]">{userName || "User"}</p>
+  <p className="text-xs text-gray-500">{userRole}</p>
+</div>
+
+        <button
+          onClick={() => setShowProfile(false)}
+          className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="h-px bg-gray-200/70" />
+
+      {/* Quick Stats */}
+      <div className="p-4 grid grid-cols-3 gap-2 text-center">
+        <div className="bg-white/70 border border-gray-200 rounded-2xl py-2 shadow-sm">
+          <p className="text-xs text-gray-500">Today</p>
+          <p className="text-sm font-semibold">{todayMinutes}m</p>
         </div>
-      )}
+
+      <div className="bg-white/70 border border-gray-200 rounded-2xl py-2 shadow-sm">
+          <p className="text-xs text-gray-500">Target</p>
+          <p className="text-sm font-semibold">{targetMinutes}m</p>
+        </div>
+
+      <div className="bg-white/70 border border-gray-200 rounded-2xl py-2 shadow-sm"> 
+          <p className="text-xs text-gray-500">Streak</p>
+          <p className="text-sm font-semibold">🔥 {streakCount}</p>
+        </div>
+      </div>
+
+<div className="h-px bg-gray-200/70" />
+
+      {/* Options */}
+      <div className="p-2 text-sm">
+        <button
+          onClick={() => {
+            setShowProfile(false);
+            alert("✅ Profile page coming soon!");
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+        >
+          <span>👤</span>
+          <span className="flex-1 text-left">My Profile</span>
+          <span className="text-gray-400">›</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setShowProfile(false);
+            alert("⚙️ Settings coming soon!");
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+        >
+          <span>⚙️</span>
+          <span className="flex-1 text-left">Settings</span>
+          <span className="text-gray-400">›</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setShowProfile(false);
+            alert("ℹ️ About GFS coming soon!");
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-100 transition"
+        >
+          <span>ℹ️</span>
+          <span className="flex-1 text-left">About</span>
+          <span className="text-gray-400">›</span>
+        </button>
+
+        <div className="h-px bg-gray-200/70" />
+
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("userId");
+            setShowProfile(false);
+            router.push("/login");
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 transition"
+        >
+          <span>🚪</span>
+          <span className="flex-1 text-left font-medium">Logout</span>
+        </button>
+      </div>
+    </div>
+  </>
+)}
 
       {/* ================= MAIN BODY ================= */}
       <div className="relative z-10 flex flex-1 overflow-hidden">
