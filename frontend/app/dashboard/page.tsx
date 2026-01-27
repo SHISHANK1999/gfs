@@ -57,8 +57,9 @@ useEffect(() => {
     try {
       setLoadingSummary(true);
       const token = localStorage.getItem("token");
+      const API = process.env.NEXT_PUBLIC_API_URL;
 
-      const res = await fetch("http://localhost:5001/api/summary/today", {
+      const res = await fetch(`${API}/api/summary/today`, {
         headers: {
           Authorization: `Bearer ${token}`
         }

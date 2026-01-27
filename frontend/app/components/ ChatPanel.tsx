@@ -26,7 +26,7 @@ type Member = {
   name?: string;
   phoneNumber: string;
 };
-
+const API = process.env.NEXT_PUBLIC_API_URL;
 /* ================= COMPONENT ================= */
 const getUserIdFromToken = () => {
   try {
@@ -50,10 +50,11 @@ export default function ChatPanel() {
  const [groups, setGroups] = useState<Group[]>([]);
 
  useEffect(() => {
-  const fetchGroups = async () => {
+    const fetchGroups = async () => {
     const token = localStorage.getItem("token");
+    const API = process.env.NEXT_PUBLIC_API_URL;
 
-    const res = await fetch("http://localhost:5001/api/groups", {
+    const res = await fetch(`${API}/api/groups`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -82,8 +83,9 @@ const createGroup = async (name: string) => {
 
   try {
     const token = localStorage.getItem("token");
+    const API = process.env.NEXT_PUBLIC_API_URL;
 
-    const res = await fetch("http://localhost:5001/api/groups", {
+    const res = await fetch(`${API}/api/groups`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -117,8 +119,9 @@ const [activeGroupId, setActiveGroupId] = useState<string>("");
   const fetchGroups = async () => {
     try {
       const token = localStorage.getItem("token");
+      const API = process.env.NEXT_PUBLIC_API_URL;
 
-      const res = await fetch("http://localhost:5001/api/groups", {
+      const res = await fetch(`${API}/api/groups`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -296,7 +299,8 @@ useEffect(() => {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("http://localhost:5001/api/upload", {
+    const API = process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(`${API}/api/upload`, {
       method: "POST",
       body: formData
     });
@@ -318,7 +322,9 @@ useEffect(() => {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await fetch("http://localhost:5001/api/groups", {
+    const API = process.env.NEXT_PUBLIC_API_URL;
+
+    const res = await fetch(`${API}/api/groups`, {
       headers: {
         Authorization: `Bearer ${token}`
       }
@@ -347,8 +353,8 @@ useEffect(() => {
   }
 };
 
-  const API_BASE = "http://localhost:5001";
-const token = () => localStorage.getItem("token");
+const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
+const getToken = () => localStorage.getItem("token");
 
 const fetchMembers = async (groupId: string) => {
   try {
@@ -451,8 +457,9 @@ const handleDeleteMessage = async (msg: Message) => {
 
   try {
     const token = localStorage.getItem("token");
+    const API = process.env.NEXT_PUBLIC_API_URL;
 
-    const res = await fetch(`http://localhost:5001/api/messages/${messageId}`, {
+    const res = await fetch(`${API}/api/messages/${messageId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`
@@ -501,8 +508,9 @@ const removeMember = async (userId: string) => {
   // Fetch messages for a group
   const fetchMessages = async (groupId: string) => {
   const token = localStorage.getItem("token");
+  const API = process.env.NEXT_PUBLIC_API_URL;
 
-  const res = await fetch(`http://localhost:5001/api/messages/${groupId}`, {
+  const res = await fetch(`${API}/api/messages/${groupId}`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -569,8 +577,9 @@ const removeMember = async (userId: string) => {
   // Fetch messages for a group
   const fetchMessages = async (groupId: string) => {
   const token = localStorage.getItem("token");
+  const API = process.env.NEXT_PUBLIC_API_URL;
 
-  const res = await fetch(`http://localhost:5001/api/messages/${groupId}`, {
+  const res = await fetch(`${API}/api/messages/${groupId}`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -864,11 +873,13 @@ const removeMember = async (userId: string) => {
             🖼 View
           </a>
           <a
-            href={`http://localhost:5001/api/download/${contextMenu.fileUrl.split("/").pop()}`}
-            className="block px-4 py-2 hover:bg-gray-100"
-          >
-            ⬇️ Download
-          </a>
+  href={`${API}/api/download/${contextMenu.fileUrl.split("/").pop()}`}
+  className="block px-4 py-2 hover:bg-gray-100"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Download
+</a>
           <div className="px-4 py-2 text-xs text-gray-500">{contextMenu.fileName}</div>
         </div>
       )}
