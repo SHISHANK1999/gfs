@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 const PURPOSES = [
-  { id: "student", label: "🎓 Student", desc: "School or college studies" },
-  { id: "professional", label: "💼 Professional", desc: "Job or skill upgrade" },
-  { id: "competitive", label: "📚 Competitive Exams", desc: "UPSC, SSC, etc." },
-  { id: "self", label: "🧠 Self Improvement", desc: "Habit & personal growth" }
+  { id: "🎓 Student", label: "🎓 Student", desc: "School or college studies" },
+  { id: "💼 Professional", label: "💼 Professional", desc: "Job or skill upgrade" },
+  { id: "📚 Competitive Exams", label: "📚 Competitive Exams", desc: "UPSC, SSC, etc." },
+  { id: "🧠 Self Improvement", label: "🧠 Self Improvement", desc: "Habit & personal growth" }
 ];
 
 export default function ProfilePage() {
@@ -24,6 +24,7 @@ export default function ProfilePage() {
     // Temporary local save (backend baad me)
      localStorage.setItem("name", name);
      localStorage.setItem("studyPurpose", purpose);
+    //  localStorage.setItem("role", "MCA");        
     router.push("/dashboard");
   };
 

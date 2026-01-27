@@ -9,7 +9,7 @@ export default function SplashPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       router.push("/intro");
-    }, 2200);
+    }, 22000);
 
     return () => clearTimeout(timer);
   }, [router]);
@@ -20,7 +20,7 @@ export default function SplashPage() {
         {/* BIG LOGO */}
         <div className="relative w-56 h-56 md:w-72 md:h-72">
           <Image
-            src="/logo.png"
+            src="/icon.png"
             alt="GFS Logo"
             fill
             priority

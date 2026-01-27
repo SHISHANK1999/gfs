@@ -1,14 +1,21 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
+
 
 export default function VerifyOtpPage() {
   const [otp, setOtp] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  
+// ✅ OTP boxes state
+const [otpDigits, setOtpDigits] = useState<string[]>(Array(6).fill(""));
+const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+const otpValue = otpDigits.join("");
 
   useEffect(() => {
     const savedPhone = localStorage.getItem("phoneNumber");
@@ -19,9 +26,55 @@ export default function VerifyOtpPage() {
     }
   }, [router]);
 
+  const handleOtpChange = (value: string, index: number) => {
+  if (!/^\d?$/.test(value)) return;
+
+  const updated = [...otpDigits];
+  updated[index] = value;
+  setOtpDigits(updated);
+
+  if (value && index < 5) {
+    inputsRef.current[index + 1]?.focus();
+  }
+};
+
+const handleOtpKeyDown = (
+  e: React.KeyboardEvent<HTMLInputElement>,
+  index: number
+) => {
+  if (e.key === "Backspace") {
+    if (otpDigits[index]) {
+      const updated = [...otpDigits];
+      updated[index] = "";
+      setOtpDigits(updated);
+    } else if (index > 0) {
+      inputsRef.current[index - 1]?.focus();
+      const updated = [...otpDigits];
+      updated[index - 1] = "";
+      setOtpDigits(updated);
+    }
+  }
+};
+
+const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  e.preventDefault();
+  const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+  if (!pasted) return;
+
+  const updated = Array(6).fill("");
+  pasted.split("").forEach((ch, i) => {
+    if (i < 6) updated[i] = ch;
+  });
+
+  setOtpDigits(updated);
+
+  const nextIndex = Math.min(pasted.length, 5);
+  inputsRef.current[nextIndex]?.focus();
+};
+
  const verifyOtp = async () => {
-  if (!otp.trim()) {
-    alert("Enter OTP");
+  if (otpValue.length !== 6) {
+    alert("Enter 6 digit OTP");
     return;
   }
 
@@ -29,7 +82,7 @@ export default function VerifyOtpPage() {
     setLoading(true);
 
     const phone = localStorage.getItem("phoneNumber");
-    const name = localStorage.getItem("name"); // ✅ profile/signup page se set hona chahiye
+    const name = localStorage.getItem("name");
 
     const res = await fetch("http://localhost:5001/api/auth/verify-otp", {
       method: "POST",
@@ -38,8 +91,8 @@ export default function VerifyOtpPage() {
       },
       body: JSON.stringify({
         phoneNumber: phone,
-        otp,
-        name: name || "User" // ✅ fallback
+        otp: otpValue,
+        name: name || "User"
       })
     });
 
@@ -55,8 +108,19 @@ export default function VerifyOtpPage() {
     localStorage.setItem("userId", data.user._id);
     localStorage.setItem("name", data.user.name);
 
-    alert("✅ Login Successful");
-    router.push("/dashboard");
+    // ✅ profile check
+    const isProfileComplete =
+      data.user?.name && data.user.name.trim().toLowerCase() !== "user";
+
+    // ✅ अगर profile complete है → dashboard
+    if (isProfileComplete) {
+      alert("✅ Login Successful");
+      router.push("/dashboard");
+      return;
+    }
+
+    // ✅ वरना बिना msg के profile page
+    router.push("/profile");
   } catch (error) {
     alert("Backend issue, try again");
   } finally {
@@ -69,7 +133,7 @@ export default function VerifyOtpPage() {
     <div className="min-h-screen flex items-center justify-center bg-white px-6">
       <div className="max-w-sm w-full flex flex-col items-center text-center">
         {/* LOGO */}
-        <div className="relative w-28 h-28 mb-6">
+        <div className="relative w-70 h-50">
           <Image
             src="/logo.png"
             alt="GFS Logo"
@@ -88,15 +152,28 @@ export default function VerifyOtpPage() {
         </p>
 
         {/* OTP INPUT */}
-        <input
-          type="text"
-          placeholder="Enter OTP"
-          value={otp}
-          onChange={(e) => setOtp(e.target.value)}
-          className="mt-6 w-full border border-gray-300 rounded-xl px-4 py-3
-          text-center tracking-widest text-lg focus:outline-none
-          focus:ring-2 focus:ring-[#0EA5E9]"
-        />
+        {/* ✅ OTP BOXES (6 digit) */}
+<div className="mt-6 w-full flex justify-center">
+  <div className="grid grid-cols-6 gap-2 w-full max-w-[320px]">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <input
+        key={i}
+        ref={(el) => {
+          // @ts-ignore
+          inputsRef.current[i] = el;
+        }}
+        value={otpDigits[i] || ""}
+        onChange={(e) => handleOtpChange(e.target.value, i)}
+        onKeyDown={(e) => handleOtpKeyDown(e, i)}
+        onPaste={handleOtpPaste}
+        inputMode="numeric"
+        maxLength={1}
+        className="h-12 w-full rounded-xl border border-gray-300 text-center text-lg font-semibold
+        focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
+      />
+    ))}
+  </div>
+</div>
 
         {/* BUTTON */}
         <button

@@ -8,7 +8,6 @@ export default function DashboardPage() {
   const router = useRouter();
 
 // const userName = localStorage.getItem("name") || "User";
-const userRole = "Student • MCA • GFS";
 const [profileName, setProfileName] = useState("User");
 
 useEffect(() => {
@@ -250,7 +249,9 @@ useEffect(() => {
 
 <div className="flex-1">
   <p className="text-sm font-semibold text-[#0F172A]">{userName || "User"}</p>
-  <p className="text-xs text-gray-500">{userRole}</p>
+ <p className="text-xs text-gray-500">
+  {`${localStorage.getItem("studyPurpose") || "Student"}`}
+</p>
 </div>
 
         <button

@@ -9,7 +9,7 @@ export default function IntroPage() {
     <div className="min-h-screen flex items-center justify-center bg-white px-6">
       <div className="max-w-sm w-full flex flex-col items-center text-center">
         {/* LOGO SMALL */}
-        <div className="relative w-32 h-32 mb-6">
+        <div className="relative  w-70 h-50 ">
           <Image
             src="/logo.png"
             alt="GFS Logo"

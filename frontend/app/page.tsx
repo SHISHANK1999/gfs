@@ -21,7 +21,7 @@ export default function SplashPage() {
            {/* BIG LOGO */}
            <div className="relative w-56 h-56 md:w-150 md:h-120">
              <Image
-               src="/logo.png"
+               src="/icon.png"
                alt="GFS Logo"
                fill
                priority
