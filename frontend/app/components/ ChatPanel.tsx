@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { socket } from "../lib/socket";
+import { socket } from "@/app/lib/socket";
 
 /* ================= TYPES ================= */
 
@@ -40,43 +40,41 @@ const getUserIdFromToken = () => {
   }
 };
 
-export default function ChatPanel() {
+export default function ChatPanel({}) {
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const senderId = getUserIdFromToken();
   const senderName = "Shishank";
-
-  /* ===== Groups ===== */
  const [groups, setGroups] = useState<Group[]>([]);
+// *
+//  useEffect(() => {
+//     const fetchGroups = async () => {
+//     const token = localStorage.getItem("token");
+//     const API = process.env.NEXT_PUBLIC_API_URL;
 
- useEffect(() => {
-    const fetchGroups = async () => {
-    const token = localStorage.getItem("token");
-    const API = process.env.NEXT_PUBLIC_API_URL;
+//     const res = await fetch(`${API}/api/groups`, {
+//       headers: {
+//         Authorization: `Bearer ${token}`
+//       }
+//     });
 
-    const res = await fetch(`${API}/api/groups`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+//     const data = await res.json();
 
-    const data = await res.json();
+//     const realGroups = (data.groups || []).map((g: any) => ({
+//       id: g._id,
+//       name: g.name
+//     }));
 
-    const realGroups = (data.groups || []).map((g: any) => ({
-      id: g._id,
-      name: g.name
-    }));
+//     setGroups(realGroups);
 
-    setGroups(realGroups);
+//      if (realGroups.length > 0) {
+//       setActiveGroupId(realGroups[0].id);
+//       fetchMessages(realGroups[0].id);
+//     }
+//   };
 
-     if (realGroups.length > 0) {
-      setActiveGroupId(realGroups[0].id);
-      fetchMessages(realGroups[0].id);
-    }
-  };
-
-  fetchGroups();
-}, []);
+//   fetchGroups();
+// }, []);
 
 const createGroup = async (name: string) => {
    if (creatingGroup) return;
@@ -115,38 +113,39 @@ const createGroup = async (name: string) => {
 
 
 const [activeGroupId, setActiveGroupId] = useState<string>("");
-  useEffect(() => {
-  const fetchGroups = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const API = process.env.NEXT_PUBLIC_API_URL;
+// *
+//   useEffect(() => {
+//   const fetchGroups = async () => {
+//     try {
+//       const token = localStorage.getItem("token");
+//       const API = process.env.NEXT_PUBLIC_API_URL;
 
-      const res = await fetch(`${API}/api/groups`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+//       const res = await fetch(`${API}/api/groups`, {
+//         headers: {
+//           Authorization: `Bearer ${token}`
+//         }
+//       });
 
-      const data = await res.json();
+//       const data = await res.json();
 
-      const realGroups = (data.groups || []).map((g: any) => ({
-        id: g._id,
-        name: g.name
-      }));
+//       const realGroups = (data.groups || []).map((g: any) => ({
+//         id: g._id,
+//         name: g.name
+//       }));
 
-      setGroups(realGroups);
+//       setGroups(realGroups);
 
-      // ✅ default first group select
-      if (realGroups.length > 0) {
-        setActiveGroupId(realGroups[0].id);
-      }
-    } catch (err) {
-      console.log("Fetch groups error:", err);
-    }
-  };
+//       // ✅ default first group select
+//       if (realGroups.length > 0) {
+//         setActiveGroupId(realGroups[0].id);
+//       }
+//     } catch (err) {
+//       console.log("Fetch groups error:", err);
+//     }
+//   };
 
-  fetchGroups();
-}, []);
+//   fetchGroups();
+// }, []);
 
  /* ===== CHAT STATE ===== */
 
@@ -170,6 +169,41 @@ const [activeGroupId, setActiveGroupId] = useState<string>("");
      } | null>(null);
 
 const activeGroup = groups.find((g: any) => (g._id || g.id) === activeGroupId);
+
+const fetchGroups = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const API = process.env.NEXT_PUBLIC_API_URL;
+
+      const res = await fetch(`${API}/api/groups`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        console.log("Fetch groups failed:", data.message);
+        return;
+      }
+
+      const normalizedGroups = (data.groups || []).map((g: any) => ({
+        id: g._id,
+        name: g.name
+      }));
+
+      setGroups(normalizedGroups);
+
+      if (normalizedGroups.length > 0 && !activeGroupId) {
+        const firstGroupId = normalizedGroups[0].id;
+        setActiveGroupId(firstGroupId);
+        fetchMessages(firstGroupId);
+      }
+    } catch (err) {
+      console.log("Fetch groups error:", err);
+    }
+  };
 
   /* ================= SOCKET ================= */
 
@@ -318,40 +352,41 @@ useEffect(() => {
   fetchGroups();
 }, []); 
 
-  const fetchGroups = async () => {
-  try {
-    const token = localStorage.getItem("token");
+// *
+//   const fetchGroups = async () => {
+//   try {
+//     const token = localStorage.getItem("token");
 
-    const API = process.env.NEXT_PUBLIC_API_URL;
+//     const API = process.env.NEXT_PUBLIC_API_URL;
 
-    const res = await fetch(`${API}/api/groups`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
+//     const res = await fetch(`${API}/api/groups`, {
+//       headers: {
+//         Authorization: `Bearer ${token}`
+//       }
+//     });
 
-    const data = await res.json();
+//     const data = await res.json();
 
-    if (!data.success) {
-      console.log("Fetch groups failed:", data.message);
-      return;
-    }
+//     if (!data.success) {
+//       console.log("Fetch groups failed:", data.message);
+//       return;
+//     }
 
-    setGroups(data.groups || []);
+//     setGroups(data.groups || []);
 
-    // ✅ auto-select first group
-    if (data.groups?.length > 0) {
-  const firstGroupId = data.groups[0]._id;
+//     // ✅ auto-select first group
+//     if (data.groups?.length > 0) {
+//   const firstGroupId = data.groups[0]._id;
 
-  setActiveGroupId(firstGroupId);
+//   setActiveGroupId(firstGroupId);
 
-  // ✅ group set होते ही messages भी load करा दो
-  fetchMessages(firstGroupId);
-}
-  } catch (err) {
-    console.log("Fetch groups error:", err);
-  }
-};
+//   // ✅ group set होते ही messages भी load करा दो
+//   fetchMessages(firstGroupId);
+// }
+//   } catch (err) {
+//     console.log("Fetch groups error:", err);
+//   }
+// };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 const getToken = () => localStorage.getItem("token");
