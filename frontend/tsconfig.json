@@ -17,16 +17,26 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+
+    "baseUrl": ".",                 // ✅ ADD THIS
+    "paths": {
+      "@/*": ["./*"]
+    },
+
     "plugins": [
       {
         "name": "next"
       }
+<<<<<<< HEAD
     ],
     "paths": {
       "@/*": [
         "./*"
       ]
     }
+=======
+    ]
+>>>>>>> stable-day13
   },
   "include": [
     "next-env.d.ts",
@@ -34,9 +44,15 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "next.config.js"
   ],
+<<<<<<< HEAD
   "exclude": [
     "node_modules"
   ]
 }
+=======
+  "exclude": ["node_modules"]
+}
+>>>>>>> stable-day13

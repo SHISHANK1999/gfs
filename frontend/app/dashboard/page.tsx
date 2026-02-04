@@ -345,8 +345,8 @@ useEffect(() => {
       {/* ================= MAIN BODY ================= */}
       <div className="relative z-10 flex flex-1 overflow-hidden">
         <ChatPanel
-          activeGroupId={activeGroupId}
-          setActiveGroupId={setActiveGroupId}
+          // activeGroupId={activeGroupId}
+          // setActiveGroupId={setActiveGroupId}
         />
       </div>
 

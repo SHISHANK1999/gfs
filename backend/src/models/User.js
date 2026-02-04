@@ -12,6 +12,10 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true
     },
+    profileCompleted: {
+    type: Boolean,
+    default: false
+  },
 
     streakCount: {
       type: Number,
