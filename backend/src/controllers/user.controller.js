@@ -38,7 +38,8 @@ exports.updateMyProfile = async (req, res) => {
       userId,
       {
         name,
-        dailyStudyTarget
+        dailyStudyTarget,
+        profileCompleted: true
       },
       { new: true }
     );

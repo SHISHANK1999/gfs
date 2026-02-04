@@ -69,8 +69,8 @@ export default function ChatPanel() {
     setGroups(realGroups);
 
      if (realGroups.length > 0) {
-      setActiveGroupId(realGroups[0].id);
-      fetchMessages(realGroups[0].id);
+      setActiveGroupId(realGroups[0]._id);
+      fetchMessages(realGroups[0]._id);
     }
   };
 
@@ -252,7 +252,7 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  const handleNotify = ({ groupId, text }) => {
+  const handleNotify = ({ groupId, text }: { groupId: string; text: string }) => {
     if (groupId !== activeGroupId) {
       alert("🔔 " + text);
     }
@@ -405,10 +405,10 @@ await fetchGroups();
 alert("✅ Group deleted");
 
   // UI update
-  setGroups((prev) => prev.filter((g) => g.id !== activeGroupId));
+  setGroups((prev) => prev.filter((g) => g._id !== activeGroupId));
   setActiveGroupId((prev) => {
-    const remaining = groups.filter((g) => g.id !== prev);
-    return remaining.length > 0 ? remaining[0].id : "";
+    const remaining = groups.filter((g) => g._id !== prev);
+    return remaining.length > 0 ? remaining[0]._id : "";
   });
 
   setShowGroupMenu(false);

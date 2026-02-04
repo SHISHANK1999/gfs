@@ -58,8 +58,9 @@ useEffect(() => {
     try {
       setLoadingSummary(true);
       const token = localStorage.getItem("token");
+      const API = process.env.NEXT_PUBLIC_API_URL;
 
-      const res = await fetch("http://localhost:5001/api/summary/today", {
+      const res = await fetch(`${API}/api/summary/today`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -343,8 +344,8 @@ useEffect(() => {
       {/* ================= MAIN BODY ================= */}
       <div className="relative z-10 flex flex-1 overflow-hidden">
         <ChatPanel
-          activeGroupId={activeGroupId}
-          setActiveGroupId={setActiveGroupId}
+          // activeGroupId={activeGroupId}
+          // setActiveGroupId={setActiveGroupId}
         />
       </div>
 

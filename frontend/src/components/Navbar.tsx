@@ -1,5 +1,5 @@
 "use client";
-import { logoutUser } from "@/lib/auth";
+import { logoutUser } from "../lib/auth";
 
 export default function Navbar() {
   return (
