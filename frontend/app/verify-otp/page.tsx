@@ -83,8 +83,9 @@ const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
 
     const phone = localStorage.getItem("phoneNumber");
     const name = localStorage.getItem("name");
+    const API = process.env.NEXT_PUBLIC_API_URL;
 
-    const res = await fetch("http://localhost:5001/api/auth/verify-otp", {
+    const res = await fetch(`${API}/api/auth/verify-otp`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
