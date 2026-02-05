@@ -65,7 +65,13 @@ useEffect(() => {
         }
       });
 
+      if (!res.ok) {
+      console.warn("Summary API not available yet");
+      return; // 👈 VERY IMPORTANT
+     }
+
       const data = await res.json();
+      // setSummary(data);
 
       if (!data.success) {
         console.log("Summary fetch failed:", data.message);

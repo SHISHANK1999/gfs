@@ -68,7 +68,7 @@ export default function ChatPanel({ }) {
       }
 
       const normalizedGroups = (data.groups || []).map((g: any) => ({
-        id: g._id,
+        _id: g._id,
         name: g.name
       }));
 
@@ -77,7 +77,6 @@ export default function ChatPanel({ }) {
       if (normalizedGroups.length > 0 && !activeGroupId) {
         const firstGroupId = normalizedGroups[0].id;
         setActiveGroupId(firstGroupId);
-        fetchMessages(firstGroupId);
       }
     } catch (err) {
       console.log("Fetch groups error:", err);
@@ -405,6 +404,8 @@ export default function ChatPanel({ }) {
 
   // Fetch messages for a group
   const fetchMessages = async (groupId: string) => {
+    if (!groupId) return;
+
     const token = localStorage.getItem("token");
     const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -413,6 +414,8 @@ export default function ChatPanel({ }) {
         Authorization: `Bearer ${token}`
       }
     });
+
+     if (!res.ok) return;
 
     const data = await res.json();
 
@@ -432,6 +435,12 @@ export default function ChatPanel({ }) {
       }))
     }));
   };
+
+  useEffect(() => {
+  if (!activeGroupId) return;
+
+  fetchMessages(activeGroupId);
+}, [activeGroupId]);
 
   // Check if file is image
   const isImage = (fileName?: string) => {
@@ -468,7 +477,6 @@ export default function ChatPanel({ }) {
               key={group._id || `${group.name}-${index}`}
               onClick={() => {
                 setActiveGroupId(group._id);
-                fetchMessages(group._id);
 
                 // ✅ unread reset when opening the group
                 setUnreadCounts((prev) => ({
