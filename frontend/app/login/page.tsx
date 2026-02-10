@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import { API_BASE_URL } from "@/app/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -88,14 +89,11 @@ export default function LoginPage() {
     try {
       setLoading(true);
 
-      const res = await fetch(
-        "https://gfs-backend-0sy3.onrender.com/api/auth/send-otp",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phoneNumber })
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/auth/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber })
+      });
 
       const data = await res.json();
 
@@ -134,26 +132,26 @@ export default function LoginPage() {
           </p>
 
           {/* ✅ 10 Digit Input Boxes (Responsive + Always in one row) */}
-        <div className="mt-6 w-full flex justify-center">
-  <div className="grid grid-cols-10 gap-2 max-w-[520px] w-full">
-    {digits.map((d, i) => (
-      <input
-        key={i}
-        ref={(el) => {
-          inputsRef.current[i] = el;
-        }}
-        value={d}
-        onChange={(e) => handleChange(e.target.value, i)}
-        onKeyDown={(e) => handleKeyDown(e, i)}
-        onPaste={handlePaste}
-        inputMode="numeric"
-        maxLength={1}
-        className="w-full aspect-square border border-gray-300 rounded-xl text-center text-base font-semibold
+          <div className="mt-6 w-full flex justify-center">
+            <div className="grid grid-cols-10 gap-2 max-w-[520px] w-full">
+              {digits.map((d, i) => (
+                <input
+                  key={i}
+                  ref={(el) => {
+                    inputsRef.current[i] = el;
+                  }}
+                  value={d}
+                  onChange={(e) => handleChange(e.target.value, i)}
+                  onKeyDown={(e) => handleKeyDown(e, i)}
+                  onPaste={handlePaste}
+                  inputMode="numeric"
+                  maxLength={1}
+                  className="w-full aspect-square border border-gray-300 rounded-xl text-center text-base font-semibold
         focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
-      />
-    ))}
-  </div>
-</div>
+                />
+              ))}
+            </div>
+          </div>
 
           {/* BUTTON */}
           <button

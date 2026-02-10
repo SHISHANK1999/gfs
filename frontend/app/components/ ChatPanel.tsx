@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { socket } from "@/app/lib/socket";
+import { API_BASE_URL } from "@/app/lib/api";
 
 /* ================= TYPES ================= */
 
@@ -26,7 +27,7 @@ type Member = {
   name?: string;
   phoneNumber: string;
 };
-const API = process.env.NEXT_PUBLIC_API_URL;
+
 /* ================= COMPONENT ================= */
 const getUserIdFromToken = () => {
   try {
@@ -34,14 +35,19 @@ const getUserIdFromToken = () => {
     if (!token) return null;
 
     const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.userId; // ✅ तुम backend में यही भेज रहे हो
+    return payload.userId;
   } catch (err) {
     return null;
   }
 };
 
-export default function ChatPanel({ }) {
+const toAbsoluteUrl = (fileUrl?: string | null) => {
+  if (!fileUrl) return fileUrl;
+  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+  return `${API_BASE_URL}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+};
 
+export default function ChatPanel() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const senderId = getUserIdFromToken();
   const senderName = "Shishank";
@@ -49,14 +55,32 @@ export default function ChatPanel({ }) {
   const [activeGroupId, setActiveGroupId] = useState<string>("");
   const [creatingGroup, setCreatingGroup] = useState(false);
 
+  const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const [chatInput, setChatInput] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [showGroupDetails, setShowGroupDetails] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invitePhone, setInvitePhone] = useState("");
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    fileUrl: string;
+    fileName?: string;
+  } | null>(null);
+
+  const activeGroup = groups.find((g: any) => (g._id || g.id) === activeGroupId);
+  const getToken = () => localStorage.getItem("token");
+
   const fetchGroups = async () => {
     try {
-      const token = localStorage.getItem("token");
+      const token = getToken();
       if (!token) return;
 
-      const API = process.env.NEXT_PUBLIC_API_URL;
-
-      const res = await fetch(`${API}/api/groups`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -74,27 +98,66 @@ export default function ChatPanel({ }) {
 
       setGroups(normalizedGroups);
 
-      if (normalizedGroups.length > 0 && !activeGroupId) {
-        const firstGroupId = normalizedGroups[0].id;
-        setActiveGroupId(firstGroupId);
-      }
+      setActiveGroupId((prev) => {
+        if (prev && normalizedGroups.some((g: Group) => g._id === prev)) return prev;
+        return normalizedGroups[0]?._id || "";
+      });
     } catch (err) {
       console.log("Fetch groups error:", err);
     }
+  };
+
+  const fetchMessages = async (groupId: string) => {
+    if (!groupId) return;
+
+    const token = getToken();
+    if (!token) return;
+
+    const res = await fetch(`${API_BASE_URL}/api/messages/${groupId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+
+    setMessages((prev) => ({
+      ...prev,
+      [groupId]: (data.messages || []).map((m: any) => ({
+        id: m._id,
+        sender: m.senderName || "User",
+        senderId: m.senderId,
+        text: m.text,
+        time: new Date(m.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        }),
+        fileUrl: toAbsoluteUrl(m.fileUrl),
+        fileName: m.fileName
+      }))
+    }));
   };
 
   useEffect(() => {
     fetchGroups();
   }, []);
 
+  useEffect(() => {
+    if (!activeGroupId) return;
+    fetchMessages(activeGroupId);
+  }, [activeGroupId]);
+
   const createGroup = async (name: string) => {
     if (creatingGroup) return;
+    setCreatingGroup(true);
 
     try {
-      const token = localStorage.getItem("token");
-      const API = process.env.NEXT_PUBLIC_API_URL;
+      const token = getToken();
+      if (!token) return;
 
-      const res = await fetch(`${API}/api/groups`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -110,11 +173,9 @@ export default function ChatPanel({ }) {
         return;
       }
 
-      // ✅ add new group instantly in sidebar
       setGroups((prev) => [data.group, ...prev]);
-
-      // ✅ auto open that group
       setActiveGroupId(data.group._id);
+      setUnreadCounts((prev) => ({ ...prev, [data.group._id]: 0 }));
     } catch (err) {
       console.log("Create group error:", err);
     } finally {
@@ -122,37 +183,11 @@ export default function ChatPanel({ }) {
     }
   };
 
-  /* ===== CHAT STATE ===== */
-
-  const [messages, setMessages] = useState<Record<string, Message[]>>({});
-  const [chatInput, setChatInput] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [showGroupMenu, setShowGroupMenu] = useState(false);
-  const [showGroupDetails, setShowGroupDetails] = useState(false);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [invitePhone, setInvitePhone] = useState("");
-  const [loadingMembers, setLoadingMembers] = useState(false);
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-
-  /* ===== CONTEXT MENU ===== */
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    fileUrl: string;
-    fileName?: string;
-  } | null>(null);
-
-  const activeGroup = groups.find((g: any) => (g._id || g.id) === activeGroupId);
-
-  /* ================= SOCKET ================= */
-
-  // ✅ Join active group room
   useEffect(() => {
     if (!activeGroupId) return;
     socket.emit("join-group", activeGroupId);
   }, [activeGroupId]);
 
-  // ✅ Receive messages + Unread count
   useEffect(() => {
     const handleReceive = ({ groupId, message }: any) => {
       const incomingId = message?._id || message?.id;
@@ -160,23 +195,19 @@ export default function ChatPanel({ }) {
       setMessages((prev) => {
         const oldMessages = prev[groupId] || [];
 
-        // ✅ Duplicate check
         const alreadyExists = oldMessages.some((m: any) => {
           const oldId = m?._id || m?.id;
           return oldId && incomingId && oldId === incomingId;
         });
 
-        // ✅ agar message already hai to kuch mat karo
         if (alreadyExists) return prev;
 
-        // ✅ new message add
         return {
           ...prev,
-          [groupId]: [...oldMessages, message]
+          [groupId]: [...oldMessages, { ...message, fileUrl: toAbsoluteUrl(message?.fileUrl) }]
         };
       });
 
-      // ✅ unread increase ONLY when new msg actually came + other group
       if (groupId !== activeGroupId) {
         setUnreadCounts((prev) => ({
           ...prev,
@@ -195,9 +226,7 @@ export default function ChatPanel({ }) {
   useEffect(() => {
     const handleFocusStarted = (data: any) => {
       console.log("✅ focus-started received:", data);
-      alert(
-        `🔥 Focus Started!\n\n${data.user} started ${data.subject} for ${data.duration} min`
-      );
+      alert(`🔥 Focus Started!\n\n${data.user} started ${data.subject} for ${data.duration} min`);
     };
 
     socket.on("focus-started", handleFocusStarted);
@@ -221,36 +250,28 @@ export default function ChatPanel({ }) {
     };
   }, [activeGroupId]);
 
-
-  /* ================= HELPERS ================= */
-
-  // Upload file to backend
   const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
 
-    const API = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${API}/api/upload`, {
+    const res = await fetch(`${API_BASE_URL}/api/upload`, {
       method: "POST",
       body: formData
     });
 
     const data = await res.json();
-    return "http://localhost:5001" + data.fileUrl;
+    return toAbsoluteUrl(data.fileUrl) || null;
   };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeGroupId, messages[activeGroupId]?.length]);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
-  const getToken = () => localStorage.getItem("token");
-
   const fetchMembers = async (groupId: string) => {
     try {
       setLoadingMembers(true);
 
-      const res = await fetch(`${API_BASE}/api/groups/${groupId}/members`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/${groupId}/members`, {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
 
@@ -270,12 +291,13 @@ export default function ChatPanel({ }) {
     }
   };
 
-  // Delete group
   const deleteGroup = async () => {
     const confirmDelete = confirm("Are you sure you want to delete this group?");
-    if (!confirmDelete) return;
+    if (!confirmDelete || !activeGroupId) return;
 
-    const res = await fetch(`${API_BASE}/api/groups/${activeGroupId}`, {
+    const groupToDelete = activeGroupId;
+
+    const res = await fetch(`${API_BASE_URL}/api/groups/${groupToDelete}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${getToken()}`
@@ -289,27 +311,26 @@ export default function ChatPanel({ }) {
       return;
     }
 
-    setGroups((prev) => prev.filter((g) => g._id !== activeGroupId));
-    setActiveGroupId("");
+    setGroups((prev) => {
+      const remaining = prev.filter((g) => g._id !== groupToDelete);
+      setActiveGroupId(remaining[0]?._id || "");
+      return remaining;
+    });
 
-    await fetchGroups();
-
-    alert("✅ Group deleted");
-
-    // UI update
-    setGroups((prev) => prev.filter((g) => g._id !== activeGroupId));
-    setActiveGroupId((prev) => {
-      const remaining = groups.filter((g) => g._id !== prev);
-      return remaining.length > 0 ? remaining[0]._id : "";
+    setUnreadCounts((prev) => {
+      const next = { ...prev };
+      delete next[groupToDelete];
+      return next;
     });
 
     setShowGroupMenu(false);
+    alert("✅ Group deleted");
   };
 
   const inviteMember = async () => {
     if (!invitePhone.trim()) return alert("Enter phone number");
 
-    const res = await fetch(`${API_BASE}/api/groups/invite`, {
+    const res = await fetch(`${API_BASE_URL}/api/groups/invite`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -333,7 +354,6 @@ export default function ChatPanel({ }) {
     fetchMembers(activeGroupId);
   };
 
-  // Delete message
   const handleDeleteMessage = async (msg: Message) => {
     const messageId = msg._id || msg.id;
     if (!messageId) return;
@@ -342,10 +362,9 @@ export default function ChatPanel({ }) {
     if (!ok) return;
 
     try {
-      const token = localStorage.getItem("token");
-      const API = process.env.NEXT_PUBLIC_API_URL;
+      const token = getToken();
 
-      const res = await fetch(`${API}/api/messages/${messageId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/messages/${messageId}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`
@@ -359,15 +378,11 @@ export default function ChatPanel({ }) {
         return;
       }
 
-      // ✅ remove locally
       setMessages((prev) => ({
         ...prev,
-        [activeGroupId]: (prev[activeGroupId] || []).filter(
-          (m) => (m._id || m.id) !== messageId
-        )
+        [activeGroupId]: (prev[activeGroupId] || []).filter((m) => (m._id || m.id) !== messageId)
       }));
 
-      // ✅ realtime delete
       socket.emit("delete-message", {
         groupId: activeGroupId,
         messageId
@@ -377,9 +392,8 @@ export default function ChatPanel({ }) {
     }
   };
 
-  // Remove member from group
   const removeMember = async (userId: string) => {
-    const res = await fetch(`${API_BASE}/api/groups/remove-member`, {
+    const res = await fetch(`${API_BASE_URL}/api/groups/remove-member`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -402,58 +416,13 @@ export default function ChatPanel({ }) {
     fetchMembers(activeGroupId);
   };
 
-  // Fetch messages for a group
-  const fetchMessages = async (groupId: string) => {
-    if (!groupId) return;
-
-    const token = localStorage.getItem("token");
-    const API = process.env.NEXT_PUBLIC_API_URL;
-
-    const res = await fetch(`${API}/api/messages/${groupId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-     if (!res.ok) return;
-
-    const data = await res.json();
-
-    setMessages((prev) => ({
-      ...prev,
-      [groupId]: (data.messages || []).map((m: any) => ({
-        id: m._id,
-        sender: m.senderName || "User",
-        senderId: m.senderId,
-        text: m.text,
-        time: new Date(m.createdAt).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        }),
-        fileUrl: m.fileUrl,
-        fileName: m.fileName
-      }))
-    }));
-  };
-
-  useEffect(() => {
-  if (!activeGroupId) return;
-
-  fetchMessages(activeGroupId);
-}, [activeGroupId]);
-
-  // Check if file is image
   const isImage = (fileName?: string) => {
     if (!fileName) return false;
     return /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
   };
 
-  /* ================= UI ================= */
-
   return (
     <div className="flex h-full w-full bg-[#F8FAFC]">
-
-      {/* ===== LEFT: GROUP LIST ===== */}
       <aside className="w-64 bg-white p-4 shadow-[1px_0_0_0_#E0F2FE]">
         <button
           disabled={creatingGroup}
@@ -465,8 +434,9 @@ export default function ChatPanel({ }) {
 
             createGroup(name);
           }}
-          className={`w-full mb-3 py-2 text-sm rounded-lg border border-dashed text-gray-500 hover:bg-gray-50 ${creatingGroup ? "opacity-60 cursor-not-allowed" : ""
-            }`}
+          className={`w-full mb-3 py-2 text-sm rounded-lg border border-dashed text-gray-500 hover:bg-gray-50 ${
+            creatingGroup ? "opacity-60 cursor-not-allowed" : ""
+          }`}
         >
           {creatingGroup ? "Creating..." : "+ New Group"}
         </button>
@@ -477,21 +447,17 @@ export default function ChatPanel({ }) {
               key={group._id || `${group.name}-${index}`}
               onClick={() => {
                 setActiveGroupId(group._id);
-
-                // ✅ unread reset when opening the group
                 setUnreadCounts((prev) => ({
                   ...prev,
                   [group._id]: 0
                 }));
               }}
-              className={`px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between ${activeGroupId === group._id
-                  ? "bg-[#E0F2FE] text-[#0369A1] font-medium"
-                  : "hover:bg-gray-100"
-                }`}
+              className={`px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between ${
+                activeGroupId === group._id ? "bg-[#E0F2FE] text-[#0369A1] font-medium" : "hover:bg-gray-100"
+              }`}
             >
               <span className="truncate">📘 {group.name}</span>
 
-              {/* ✅ UNREAD BADGE */}
               {unreadCounts[group._id] > 0 && (
                 <span className="min-w-[22px] h-[22px] px-2 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-semibold">
                   {unreadCounts[group._id]}
@@ -502,10 +468,7 @@ export default function ChatPanel({ }) {
         </ul>
       </aside>
 
-      {/* ===== RIGHT: CHAT ===== */}
       <main className="flex-1 flex flex-col bg-gradient-to-b from-[#F0F9FF] to-[#E0F2FE]">
-
-        {/* Header */}
         <div className="h-12 bg-white flex items-center justify-between px-6 text-sm font-medium shadow-sm">
           <span>📘 {activeGroup?.name}</span>
 
@@ -540,40 +503,21 @@ export default function ChatPanel({ }) {
           </div>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 text-sm">
-
           {(messages[activeGroupId] || []).map((msg, idx) => (
-            <div
-              key={`${msg._id || msg.id}-${idx}`}
-              className={`flex ${msg.sender === "You" ? "justify-end" : "items-start gap-2"
-                }`}
-            >
+            <div key={`${msg._id || msg.id}-${idx}`} className={`flex ${msg.sender === "You" ? "justify-end" : "items-start gap-2"}`}>
               {msg.sender !== "You" && (
-                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium">
-
-                  {msg.sender?.[0] || "?"}
-                </div>
+                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium">{msg.sender?.[0] || "?"}</div>
               )}
 
-              <div
-                className={`px-4 py-2 rounded-2xl max-w-[60%] ${msg.sender === "You"
-                    ? "bg-[#E0F2FE] shadow"
-                    : "bg-white shadow"
-                  }`}
-              >
+              <div className={`px-4 py-2 rounded-2xl max-w-[60%] ${msg.sender === "You" ? "bg-[#E0F2FE] shadow" : "bg-white shadow"}`}>
                 {msg.text && <p>{msg.text}</p>}
-                {/* ✅ Delete button (text + file both) */}
                 {msg.senderId && senderId && msg.senderId === senderId && (
-                  <button
-                    onClick={() => handleDeleteMessage(msg)}
-                    className="mt-2 text-[10px] text-red-500 hover:underline"
-                  >
+                  <button onClick={() => handleDeleteMessage(msg)} className="mt-2 text-[10px] text-red-500 hover:underline">
                     Delete
                   </button>
                 )}
 
-                {/* FILE / IMAGE */}
                 {msg.fileUrl && (
                   <div className="mt-2">
                     {isImage(msg.fileName) ? (
@@ -592,17 +536,9 @@ export default function ChatPanel({ }) {
                       />
                     ) : (
                       <div className="bg-white border rounded-xl px-3 py-2 flex items-center justify-between gap-3 max-w-[240px]">
-                        <a
-                          href={msg.fileUrl}
-                          target="_blank"
-                          className="flex items-center gap-2 overflow-hidden"
-                        >
-                          <span className="text-xl">
-                            {msg.fileName?.endsWith(".pdf") ? "📄" : "📎"}
-                          </span>
-                          <span className="text-xs truncate">
-                            {msg.fileName}
-                          </span>
+                        <a href={msg.fileUrl} target="_blank" className="flex items-center gap-2 overflow-hidden">
+                          <span className="text-xl">{msg.fileName?.endsWith(".pdf") ? "📄" : "📎"}</span>
+                          <span className="text-xs truncate">{msg.fileName}</span>
                         </a>
                       </div>
                     )}
@@ -612,18 +548,14 @@ export default function ChatPanel({ }) {
                 <p className="text-[10px] text-gray-400 mt-1">
                   {msg.sender} · {msg.time}
                 </p>
-
               </div>
             </div>
           ))}
 
-
           <div ref={bottomRef} />
         </div>
 
-        {/* ===== INPUT ===== */}
         <div className="bg-white px-6 py-3 shadow-[0_-1px_0_0_#E5E7EB]">
-
           {selectedFile && (
             <div className="flex items-center justify-between bg-[#E0F2FE] px-3 py-2 rounded-lg mb-2">
               <span className="text-xs truncate">📎 {selectedFile.name}</span>
@@ -634,10 +566,14 @@ export default function ChatPanel({ }) {
           <div className="flex items-center gap-3">
             <label className="cursor-pointer text-xl">
               📎
-              <input type="file" hidden onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) setSelectedFile(file);
-              }} />
+              <input
+                type="file"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) setSelectedFile(file);
+                }}
+              />
             </label>
 
             <input
@@ -662,7 +598,7 @@ export default function ChatPanel({ }) {
                   text: chatInput,
                   time: new Date().toLocaleTimeString([], {
                     hour: "2-digit",
-                    minute: "2-digit",
+                    minute: "2-digit"
                   }),
                   fileUrl,
                   fileName: selectedFile?.name,
@@ -684,10 +620,8 @@ export default function ChatPanel({ }) {
             </button>
           </div>
         </div>
-
       </main>
 
-      {/* ===== RIGHT CLICK MENU ===== */}
       {contextMenu && (
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
@@ -698,7 +632,7 @@ export default function ChatPanel({ }) {
             🖼 View
           </a>
           <a
-            href={`${API}/api/download/${contextMenu.fileUrl.split("/").pop()}`}
+            href={`${API_BASE_URL}/api/download/${contextMenu.fileUrl.split("/").pop()}`}
             className="block px-4 py-2 hover:bg-gray-100"
             target="_blank"
             rel="noopener noreferrer"
@@ -716,19 +650,13 @@ export default function ChatPanel({ }) {
               <h2 className="text-lg font-semibold text-[#0F172A]">👥 Group Details</h2>
             </div>
 
-            {/* Group name */}
             <div className="bg-[#F8FAFC] border rounded-xl p-4">
               <p className="text-sm text-gray-500">Group</p>
-              <p className="text-base font-semibold text-[#0F172A]">
-                {activeGroup?.name}
-              </p>
+              <p className="text-base font-semibold text-[#0F172A]">{activeGroup?.name}</p>
             </div>
 
-            {/* Invite */}
             <div>
-              <p className="text-sm font-medium text-[#0F172A] mb-2">
-                Invite Member (Phone)
-              </p>
+              <p className="text-sm font-medium text-[#0F172A] mb-2">Invite Member (Phone)</p>
 
               <div className="flex gap-2">
                 <input
@@ -737,16 +665,12 @@ export default function ChatPanel({ }) {
                   placeholder="Enter phone number"
                   className="flex-1 border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]/30"
                 />
-                <button
-                  onClick={inviteMember}
-                  className="bg-[#0EA5E9] text-white px-4 py-2 rounded-xl text-sm hover:bg-[#0284C7]"
-                >
+                <button onClick={inviteMember} className="bg-[#0EA5E9] text-white px-4 py-2 rounded-xl text-sm hover:bg-[#0284C7]">
                   Add
                 </button>
               </div>
             </div>
 
-            {/* Members */}
             <div>
               <p className="text-sm font-medium text-[#0F172A] mb-2">Members</p>
 
@@ -755,44 +679,31 @@ export default function ChatPanel({ }) {
               ) : (
                 <div className="max-h-52 overflow-y-auto space-y-2">
                   {members.map((m) => (
-                    <div
-                      key={m._id}
-                      className="flex items-center justify-between bg-[#F8FAFC] border rounded-xl px-3 py-2"
-                    >
+                    <div key={m._id} className="flex items-center justify-between bg-[#F8FAFC] border rounded-xl px-3 py-2">
                       <div className="overflow-hidden">
                         <p className="text-sm font-medium truncate">{m.name || "User"}</p>
                         <p className="text-xs text-gray-500 truncate">{m.phoneNumber}</p>
                       </div>
 
-                      <button
-                        onClick={() => removeMember(m._id)}
-                        className="text-xs text-red-500 hover:underline"
-                      >
+                      <button onClick={() => removeMember(m._id)} className="text-xs text-red-500 hover:underline">
                         Remove
                       </button>
                     </div>
                   ))}
 
-                  {members.length === 0 && (
-                    <p className="text-xs text-gray-400">No members yet.</p>
-                  )}
+                  {members.length === 0 && <p className="text-xs text-gray-400">No members yet.</p>}
                 </div>
               )}
             </div>
 
             <div className="pt-2 flex justify-end">
-              <button
-                onClick={() => setShowGroupDetails(false)}
-                className="px-4 py-2 rounded-xl text-sm bg-gray-100 hover:bg-gray-200"
-              >
+              <button onClick={() => setShowGroupDetails(false)} className="px-4 py-2 rounded-xl text-sm bg-gray-100 hover:bg-gray-200">
                 Close
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
-
